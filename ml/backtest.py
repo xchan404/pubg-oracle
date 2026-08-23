@@ -1,22 +1,21 @@
-# -*- coding: utf-8 -*-
 """
 PUBG Market Intelligence - Automated Backtesting & Deal Profitability Engine
 Evaluates model performance against historical accounts using FAST batch predictions.
 Calculates real-world flipping ROI, profit margins, deal hit rate, and segment accuracy.
 """
 
+import io
 import os
 import sys
-import io
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-import pandas as pd
-import numpy as np
 import joblib
+import numpy as np
+import pandas as pd
 
 # ─── Configuration ───────────────────────────────────────────
 FLIP_SELL_MARGIN = 0.10       # 10% markup when reselling
@@ -32,7 +31,7 @@ def run_backtest(max_accounts: int = None):
     print("=" * 60)
 
     # ─── Step 1: Load Data ───────────────────────────────────
-    print(f"\n[1/4] Loading priced accounts from CSV...")
+    print("\n[1/4] Loading priced accounts from CSV...")
     df = pd.read_csv(CSV_PATH, low_memory=False)
     df = df[df['price_egp'].notna() & (df['price_egp'] > 0) & (df['price_egp'] < 200000)].copy()
     df.reset_index(drop=True, inplace=True)
@@ -84,7 +83,7 @@ def run_backtest(max_accounts: int = None):
         X_base[f'cluster_{i}'] = (cluster_ids == i).astype(int)
 
     # Add TF-IDF columns
-    for feat_name, idx in zip(tfidf_features_list, tfidf_indices):
+    for feat_name, idx in zip(tfidf_features_list, tfidf_indices, strict=False):
         if idx < tfidf_matrix.shape[1]:
             X_base[feat_name] = tfidf_matrix[:, idx]
         else:
@@ -111,7 +110,7 @@ def run_backtest(max_accounts: int = None):
     print("       Batch prediction complete.")
 
     # ─── Step 4: Profitability Analysis ──────────────────────
-    print(f"\n[4/4] Analyzing profitability metrics...")
+    print("\n[4/4] Analyzing profitability metrics...")
     asking_prices = df['price_egp'].values
 
     negotiated_buy = asking_prices * (1 - NEGOTIATION_DISCOUNT)
@@ -163,12 +162,12 @@ def run_backtest(max_accounts: int = None):
     print(f"  Mean Absolute Error (MAE)     : {mae_egp:,.0f} EGP")
     print(f"  Mean Absolute % Error (MAPE)  : {mape:.1f}%")
 
-    print(f"\n--- Deal Classification ---")
+    print("\n--- Deal Classification ---")
     print(f"  Underpriced (Fair > Ask*1.15)  : {len(underpriced_df):,} ({len(underpriced_df)/total_accounts*100:.1f}%)")
     print(f"  Fair Priced                    : {len(fair_priced_df):,} ({len(fair_priced_df)/total_accounts*100:.1f}%)")
     print(f"  Overpriced  (Fair < Ask*0.80)  : {len(overpriced_df):,} ({len(overpriced_df)/total_accounts*100:.1f}%)")
 
-    print(f"\n--- Flipping Profitability ---")
+    print("\n--- Flipping Profitability ---")
     print(f"  Profitable at Asking Price     : {len(profitable_ask):,} ({len(profitable_ask)/total_accounts*100:.1f}%)")
     print(f"  Profitable after Negotiation   : {len(profitable_neg):,} ({len(profitable_neg)/total_accounts*100:.1f}%)")
 
@@ -181,7 +180,7 @@ def run_backtest(max_accounts: int = None):
         print(f"  Max Profit (negotiated)        : {profitable_neg['profit_negotiated'].max():,.0f} EGP")
         print(f"  Total Potential Profit          : {profitable_neg['profit_negotiated'].sum():,.0f} EGP")
 
-    print(f"\n--- Segment Breakdown ---")
+    print("\n--- Segment Breakdown ---")
     if len(economy) > 0:
         eco_mae = np.abs(economy['fair_value'] - economy['asking_price']).mean()
         eco_profit = economy[economy['profit_negotiated'] >= MIN_PROFIT_EGP]
@@ -193,7 +192,7 @@ def run_backtest(max_accounts: int = None):
 
     # ─── Top 10 Best Deals ───────────────────────────────────
     if len(profitable_neg) > 0:
-        print(f"\n--- Top 10 Best Sniper Deals (by Negotiated Profit) ---")
+        print("\n--- Top 10 Best Sniper Deals (by Negotiated Profit) ---")
         top_deals = profitable_neg.nlargest(10, 'profit_negotiated')
         for rank, (_, d) in enumerate(top_deals.iterrows(), 1):
             print(f"  #{rank}: Ask {d['asking_price']:,.0f} | Fair {d['fair_value']:,.0f} | "

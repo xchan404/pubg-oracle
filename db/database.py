@@ -1,51 +1,20 @@
-import sqlite3
-import os
-import json
-from typing import Dict, Any, Optional
+"""
+DEPRECATED: This module is kept only for backwards compatibility.
+All ad storage now lives in the unified SQLAlchemy layer (database/ads.py)
+backed by data/raw/sqlite/pubg_accounts.db.
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'sniper.db')
+The legacy db/sniper.db is migrated automatically on first use.
+"""
 
-def get_connection():
-    return sqlite3.connect(DB_PATH)
+import warnings
 
-def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id INTEGER,
-            message_id INTEGER,
-            raw_text TEXT,
-            asked_price REAL,
-            fair_value REAL,
-            profit REAL,
-            segment TEXT,
-            parsed_data TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(chat_id, message_id)
-        )
-    ''')
-    conn.commit()
-    conn.close()
+warnings.warn(
+    "db.database is deprecated; import from database.ads instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-def save_ad(chat_id: int, message_id: int, raw_text: str, asked_price: Optional[float],
-            fair_value: float, profit: Optional[float], segment: str, parsed_data: Dict[str, Any]):
-    """Save ad to DB. Returns True if successfully saved (new ad), False if it already exists."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT INTO ads (chat_id, message_id, raw_text, asked_price, fair_value, profit, segment, parsed_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (chat_id, message_id, raw_text, asked_price, fair_value, profit, segment, json.dumps(parsed_data, ensure_ascii=False)))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        # Already exists (UNIQUE constraint on chat_id, message_id)
-        return False
-    finally:
-        conn.close()
+from database.ads import initialize as init_db
+from database.ads import save_ad  # noqa: E402,F401
 
-# Initialize DB on import
-init_db()
+__all__ = ["save_ad", "init_db"]

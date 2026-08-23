@@ -1,18 +1,17 @@
-# -*- coding: utf-8 -*-
 """
 محرك استخراج البيانات (Data Parser) - النسخة الشاملة v3
 مبني على تحليل الكلمات الفريدة الفعلية من الداتا المجمعة.
 """
 
 import re
-from typing import Optional
 
-def _parse_numeric_value(raw_val: str) -> Optional[float]:
+
+def _parse_numeric_value(raw_val: str) -> float | None:
     """Helper to convert strings like '15k', '15.5k', '15 الف', '15,000' to float."""
     if not raw_val:
         return None
     val_str = raw_val.strip().lower()
-    
+
     # Check for 'k' notation (e.g. 15k, 15.5k, 2.5k)
     k_match = re.search(r'(\d[\d,\.]*)\s*k\b', val_str, re.IGNORECASE)
     if k_match:
@@ -20,7 +19,7 @@ def _parse_numeric_value(raw_val: str) -> Optional[float]:
             return float(k_match.group(1).replace(',', '')) * 1000.0
         except ValueError:
             pass
-            
+
     # Check for 'الف' or 'ألف' notation
     thousand_match = re.search(r'(\d[\d,\.]*)\s*(?:ألف|الف)\b', val_str, re.IGNORECASE)
     if thousand_match:
@@ -28,7 +27,7 @@ def _parse_numeric_value(raw_val: str) -> Optional[float]:
             return float(thousand_match.group(1).replace(',', '')) * 1000.0
         except ValueError:
             pass
-            
+
     # Plain number
     plain_match = re.search(r'(\d[\d,\.]*)', val_str)
     if plain_match:
@@ -36,7 +35,7 @@ def _parse_numeric_value(raw_val: str) -> Optional[float]:
             return float(plain_match.group(1).replace(',', ''))
         except ValueError:
             pass
-            
+
     return None
 
 def extract_prices(text: str) -> tuple:
@@ -97,7 +96,7 @@ def extract_prices(text: str) -> tuple:
     return price_egp, price_usd
 
 
-def extract_level(text: str) -> Optional[int]:
+def extract_level(text: str) -> int | None:
     m = re.search(
         r'(?:لفل|ليفل|لڤل|المستو[ىي]|مستو[ىي]|lv\.?|level)\s*(?:الحساب)?\s*[:\-]?\s*(\d{1,3})',
         text, re.IGNORECASE
@@ -113,7 +112,7 @@ def extract_level(text: str) -> Optional[int]:
 # 3. عدد الميثكات
 # ─────────────────────────────────────────────────────────────
 
-def extract_mythics(text: str) -> Optional[int]:
+def extract_mythics(text: str) -> int | None:
     # 1. Primary: "ميثك" followed by numbers within 10 non-digit characters
     m1 = re.search(r'(?:ميثيك|ميثك|مثيك|مثك|مسك|mythic)[^\d\n]{0,10}?(\d{1,3})', text, re.IGNORECASE)
     if m1:
@@ -138,7 +137,7 @@ def extract_mythics(text: str) -> Optional[int]:
 # 4. عدد أسلحة المختبر
 # ─────────────────────────────────────────────────────────────
 
-def extract_guns_count(text: str) -> Optional[int]:
+def extract_guns_count(text: str) -> int | None:
     """استخراج عدد الأسلحة في مختبر التطوير."""
     m = re.search(
         r'(?:مختبر\s*التطوير|المختبر\s*المطور|التطوير|مختبر|اسلح[هة]?\s*التطوير|الا?سلح[هة]?\s*المطور[هة]?|اسلحه\s*بيطور)\s*[\[\]:\-\(\)\s]*(\d{1,3})',
@@ -177,38 +176,38 @@ def extract_weapons_detail(text: str) -> dict:
         'has_ump': False, 'ump_is_max': False,
         'has_scar': False, 'scar_is_max': False,
     }
-    
+
     # AKM
     if re.search(r'akm|اكيام|اكي\s*ام|ايه\s*كي|اي\s*كي\s*ام|اي\s*كي', text, re.IGNORECASE):
         result['has_akm'] = True
         if re.search(r'(?:akm|ايه\s*كي|اي\s*كي).{0,20}(?:ماكس|max|شكل\s*نهائي)', text, re.IGNORECASE):
             result['akm_is_max'] = True
-                
+
     # M762 / Beryl
     if re.search(r'm7|m762|ام\s*سفن|بيريل|beryl', text, re.IGNORECASE):
         result['has_m762'] = True
         if re.search(r'(?:m7|m762|ام\s*سفن|بيريل|beryl).{0,20}(?:ماكس|max|شكل\s*نهائي)', text, re.IGNORECASE):
             result['m762_is_max'] = True
-            
+
     # AWM
     if re.search(r'awm|اوم', text, re.IGNORECASE):
         result['has_awm'] = True
         if re.search(r'(?:awm|اوم).{0,20}(?:ماكس|max|شكل\s*نهائي)', text, re.IGNORECASE):
             result['awm_is_max'] = True
-            
+
     # UZI
     if re.search(r'uzi|اوزي', text, re.IGNORECASE):
         result['has_uzi'] = True
         if re.search(r'(?:uzi|اوزي).{0,20}(?:ماكس|max|شكل\s*نهائي)', text, re.IGNORECASE):
             result['uzi_is_max'] = True
-            
+
     # UMP (Rare only: الحوت، بيانو، انفجار، نبض، ثلجي، انوبيس، حاكم/حاصد OR Max/Kill Message)
     ump_rare_pattern = r'(?:ump|يومب[يى]?|يوامب[يى]?|امب|يو\s*ام\s*بي|يو\s*ان\s*بي).{0,25}(?:حوت|بيانو|انفجار|نبض|ثلجي|تلجي|ice|piano|انوبيس|حاكم|حاصد|ماكس|max|كيل|مسج|ضرر)'
     if re.search(ump_rare_pattern, text, re.IGNORECASE):
         result['has_ump'] = True
         if re.search(r'(?:ump|يومب[يى]?|يوامب[يى]?|امب|يو\s*ام\s*بي).{0,20}(?:ماكس|max|شكل\s*نهائي)', text, re.IGNORECASE):
             result['ump_is_max'] = True
-            
+
     # SCAR (Rare only: جوكر، موسيقي، اطياب، يقطين، نيون، قطبيه، غريم، ثلجي/تلجي OR Max/Kill Message)
     scar_rare_pattern = r'(?:scar|سكار|اسكار).{0,25}(?:جوكر|موسيقي|اطياب|يقطين|نيون|قطبي|غريم|تلجي|ثلجي|ماكس|max|كيل|مسج)'
     if re.search(scar_rare_pattern, text, re.IGNORECASE):
@@ -222,7 +221,7 @@ def extract_weapons_detail(text: str) -> dict:
 # NEW: لفل المجموعات
 # ─────────────────────────────────────────────────────────────
 
-def extract_collection_level(text: str) -> Optional[float]:
+def extract_collection_level(text: str) -> float | None:
     """
     استخراج لفل المجموعات (Collection Level).
     يدعم الأرقام العشرية مثل 76.5 و 83.7
@@ -256,7 +255,7 @@ def extract_companions(text: str) -> dict:
     # السيارات الميثيك والكونكر
     has_vehicle_dev = 1 if re.search(r'عربي[هة]\s*تطوير|سيار[هة]\s*تطوير|مكلارين\s*تطوير|عربي.*?بتتطور|عربي.*?للتطوير|سيار.*?للتطوير', text, re.IGNORECASE) else 0
     has_conqueror = 1 if re.search(r'كونكر|conqueror', text, re.IGNORECASE) else 0
-    
+
     return {
         'has_falcon': bool(re.search(r'صقر|الصقر|falcon', text, re.IGNORECASE)),
         'has_dog': bool(re.search(r'كلب|الكلب|شيبا|dog|shiba', text, re.IGNORECASE)),
@@ -305,7 +304,7 @@ def extract_cars_info(text: str) -> dict:
             r'(?:سيار[هةات]+|عربي[هةات]+)\s*(?:ميثك|مثيك)\s*(\d{1,2})',
             text, re.IGNORECASE
         )
-        
+
     if m2:
         v2 = int(m2.group(1))
         if 1 <= v2 <= 30:
@@ -324,7 +323,7 @@ def extract_cars_info(text: str) -> dict:
 # 5. عدد بدلات الإكس
 # ─────────────────────────────────────────────────────────────
 
-def extract_xsuits_count(text: str) -> Optional[int]:
+def extract_xsuits_count(text: str) -> int | None:
     """استخراج عدد بدلات الإكس إن وُجد."""
     # "3 بدلات اكس" أو "بدلات اكس 5"
     m = re.search(r'(\d{1,2})\s*بدلا?[تة]\s*اكس', text, re.IGNORECASE)
@@ -372,7 +371,7 @@ def extract_m4_info(text: str) -> dict:
 
     m4_pat = r'(?:[اأإآ]م\s*فور|[اأإآ]م\s*4|m4|m416)'
     raw_matches = list(re.finditer(f'{m4_pat}\\b', text, re.IGNORECASE))
-    
+
     # Filter out fake M4 mentions (like "شنطه الامفور", "خوذة الامفور")
     matches = []
     for base_m in raw_matches:
@@ -393,15 +392,15 @@ def extract_m4_info(text: str) -> dict:
         le = text.find('\n', base_m.end())
         le = len(text) if le == -1 else le
         lw = text[ls:le].lower()
-        
+
         score = sum(v for kw, v in level_kw_scores.items() if kw in lw)
-        
+
         for lv_m in re.finditer(r'(?:لفل|ليفل|لڤل|لڤيل|lv\.?|level|مستو[ىي])\s*[:\-]?\s*(\d{1,2})', lw, re.IGNORECASE):
             v = int(lv_m.group(1))
             if 1 <= v <= 10:
                 score += (v * 0.1)
                 break
-                
+
         parsed_m4s.append({
             'base': base_m,
             'ls': ls,
@@ -424,24 +423,24 @@ def extract_m4_info(text: str) -> dict:
         line_key = (m['ls'], m['le'])
         if line_key in used_lines:
             continue
-            
+
         start_idx = max(m['ls'], m['base'].start() - 35)
         end_idx = min(m['le'], m['base'].end() + 35)
         win = text[start_idx:end_idx].lower()
-        
+
         m4_type = None
         for t_key, pattern in tight_types:
             if re.search(pattern, win, re.IGNORECASE):
                 m4_type = t_key
                 break
-                
+
         m4_level = None
         for lv_m in re.finditer(r'(?:لفل|ليفل|لڤل|لڤيل|lv\.?|level|مستو[ىي])\s*[:\-]?\s*(\d{1,2})', win, re.IGNORECASE):
             v = int(lv_m.group(1))
             if 1 <= v <= 10:
                 m4_level = v
                 break
-                
+
         # Fallback for bare numbers immediately following M4 keywords (e.g. "امفور تلجي 3")
         if not m4_level:
             for bare_m in re.finditer(r'(?:[اأإآ]م\s*فور|[اأإآ]م\s*4|m4|m416|تلجي|glacier|نمر|جوكر|طقم|رحالة|سحلية|ناري|نار|النار|fire)\s*([1-7])\b', win, re.IGNORECASE):
@@ -458,7 +457,7 @@ def extract_m4_info(text: str) -> dict:
             m4_level = max(m4_level or 0, 2)
         elif bool(re.search(r'اساسي|أساسي', win, re.IGNORECASE)):
             m4_level = max(m4_level or 0, 1)
-            
+
         if m4_type or m4_level:
             final_m4s.append({
                 'm4_type': m4_type,
@@ -484,19 +483,19 @@ def extract_m4_info(text: str) -> dict:
         result['m4_type'] = final_m4s[0]['m4_type']
         result['m4_level'] = final_m4s[0]['m4_level']
         result['m4_is_max'] = final_m4s[0]['m4_is_max']
-        
+
         if has_explicit_triple:
             result['m4_count'] = max(3, len(final_m4s))
         elif has_explicit_double:
             result['m4_count'] = max(2, len(final_m4s))
         else:
             result['m4_count'] = len(final_m4s)
-            
+
         if len(final_m4s) > 1:
             result['m4_2_type'] = final_m4s[1]['m4_type']
             result['m4_2_level'] = final_m4s[1]['m4_level']
             result['m4_2_is_max'] = final_m4s[1]['m4_is_max']
-            
+
         if len(final_m4s) > 2:
             result['m4_3_type'] = final_m4s[2]['m4_type']
             result['m4_3_level'] = final_m4s[2]['m4_level']
@@ -715,7 +714,7 @@ def parse_account_data(raw_text: str, cleaned_text: str) -> dict:
     arabic_numerals = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
     cleaned_text = cleaned_text.translate(arabic_numerals)
     raw_text = raw_text.translate(arabic_numerals)
-    
+
     price_egp, price_usd = extract_prices(cleaned_text)
     m4                   = extract_m4_info(cleaned_text)
     rare                 = extract_rare_items(cleaned_text)

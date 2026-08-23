@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Frames Extractor Module
 Extracts rare frames (Plane, Conqueror, RE2, Godzilla).
 """
 
-from typing import Dict, Any
+from typing import Any
+
 from parser.extractors.base import BaseExtractor
 from parser.regex_parser import extract_frames_info
 
+
 class FrameExtractor(BaseExtractor):
-    def extract(self, text: str) -> Dict[str, Any]:
+    def extract(self, text: str) -> dict[str, Any]:
         frames = extract_frames_info(text)
         return {
             "frames_str": frames.get('frames_str', ''),

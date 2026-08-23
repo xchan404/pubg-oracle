@@ -1,0 +1,40 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+    volumes:
+      - models-data:/app/models
+      - app-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/market/summary')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  bot:
+    build: .
+    command: python bot/telegram_bot.py
+    environment:
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - MY_CHAT_ID=${MY_CHAT_ID}
+      - MIN_PROFIT_THRESHOLD=${MIN_PROFIT_THRESHOLD:-300}
+      - TARGET_CHATS=${TARGET_CHATS:-}
+    volumes:
+      - models-data:/app/models
+      - app-data:/app/data
+      - bot-sessions:/app/sessions
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  models-data:
+  app-data:
+  bot-sessions:

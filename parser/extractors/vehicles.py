@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Vehicle Extractor Module
 Extracts vehicle count, mythic vehicles, development cars, and airdrop cars.
 """
 
-from typing import Dict, Any
+from typing import Any
+
 from parser.extractors.base import BaseExtractor
 from parser.regex_parser import extract_cars_info
 
+
 class VehicleExtractor(BaseExtractor):
-    def extract(self, text: str) -> Dict[str, Any]:
+    def extract(self, text: str) -> dict[str, Any]:
         cars = extract_cars_info(text)
         return {
             "cars_total": cars.get('cars_total'),

@@ -1,27 +1,28 @@
-# -*- coding: utf-8 -*-
 """
 Skins Extractor Module
 Extracts M416 skin info, lab weapons details, X-suits, and rare outfits.
 """
 
-from typing import Dict, Any
+from typing import Any
+
 from parser.extractors.base import BaseExtractor
 from parser.regex_parser import (
+    extract_guns_count,
     extract_m4_info,
+    extract_rare_items,
     extract_weapons_detail,
     extract_xsuits_count,
-    extract_rare_items,
-    extract_guns_count
 )
 
+
 class SkinExtractor(BaseExtractor):
-    def extract(self, text: str) -> Dict[str, Any]:
+    def extract(self, text: str) -> dict[str, Any]:
         m4 = extract_m4_info(text)
         weapons = extract_weapons_detail(text)
         xsuits_count = extract_xsuits_count(text)
         rare_items = extract_rare_items(text)
         guns_count = extract_guns_count(text)
-        
+
         return {
             "m4_type": m4.get('m4_type'),
             "m4_level": m4.get('m4_level'),

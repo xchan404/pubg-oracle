@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 import json
 import logging
-from pathlib import Path
-from config import DEFAULT_CHANNELS, DATA_DIR
+
+from config import DATA_DIR, DEFAULT_CHANNELS
 
 logger = logging.getLogger("pubg_scraper")
 
@@ -15,7 +14,7 @@ def get_active_channels():
     """
     if CHANNELS_FILE.exists():
         try:
-            with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
+            with open(CHANNELS_FILE, encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("active_channels", DEFAULT_CHANNELS)
         except Exception as e:

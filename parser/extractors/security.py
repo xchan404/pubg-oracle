@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Security Extractor Module
 Extracts account security status, linkages (Twitter, Facebook, Internal), and middleman trust indicators.
 """
 
 import re
-from typing import Dict, Any
+from typing import Any
+
 from parser.extractors.base import BaseExtractor
 
+
 class SecurityExtractor(BaseExtractor):
-    def extract(self, text: str) -> Dict[str, Any]:
+    def extract(self, text: str) -> dict[str, Any]:
         if not text:
             return self._empty_security_report()
 
@@ -23,7 +24,7 @@ class SecurityExtractor(BaseExtractor):
         has_gamecenter = bool(re.search(r'جيم\s*سنتر|game\s*center|apple|ابل', text_lower))
         has_email = bool(re.search(r'إيميل|ايميل|email|mail', text_lower))
         has_phone = bool(re.search(r'رقم|موبايل|هاتف|phone', text_lower))
-        has_vk = bool(re.search(r'فكونتاكتي|vk', text_lower))
+        bool(re.search(r'فكونتاكتي|vk', text_lower))
 
         # Linkage statuses & assurances
         is_single_link = bool(re.search(r'ربط\s*واحد|سنجل\s*ربط|ربط\s*نقي|ربط\s*واحد\s*فقط|single\s*link', text_lower))
@@ -146,7 +147,7 @@ class SecurityExtractor(BaseExtractor):
             "recommended_precautions": precautions
         }
 
-    def _empty_security_report(self) -> Dict[str, Any]:
+    def _empty_security_report(self) -> dict[str, Any]:
         return {
             "has_internal_link": False,
             "has_twitter_linked": False,

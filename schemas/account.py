@@ -1,44 +1,43 @@
-# -*- coding: utf-8 -*-
 """
 Pydantic Account Schema Definition
 Enforces strict type validation and structural integrity for parsed accounts across pipeline, DB, and API.
 """
 
-from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
 
+
 class ParsedAccountSchema(BaseModel):
-    clean_text: Optional[str] = ""
-    account_level: Optional[int] = None
-    collection_level: Optional[float] = None
-    mythics_count: Optional[int] = None
-    guns_count: Optional[int] = None
-    xsuits_count: Optional[int] = None
-    
-    price_egp: Optional[float] = None
-    price_usd: Optional[float] = None
-    
-    m4_type: Optional[str] = None
-    m4_level: Optional[int] = None
-    m4_is_max: Optional[bool] = False
-    
-    cars_total: Optional[int] = None
-    cars_mythic: Optional[int] = None
-    has_airdrop_car: Optional[bool] = False
-    
-    has_internal_link: Optional[bool] = False
-    has_twitter_link: Optional[bool] = False
-    is_facebook_disabled: Optional[bool] = False
-    has_trusted_middleman: Optional[bool] = False
-    linkage_type: Optional[str] = "unknown"
-    
-    canonical_items: List[str] = Field(default_factory=list)
-    extracted_items_str: Optional[str] = ""
-    active_combos_str: Optional[str] = ""
-    
-    prestige_score: Optional[float] = 0.0
-    rarity_score: Optional[float] = 0.0
-    combo_multiplier: Optional[float] = 1.0
-    
+    clean_text: str | None = ""
+    account_level: int | None = None
+    collection_level: float | None = None
+    mythics_count: int | None = None
+    guns_count: int | None = None
+    xsuits_count: int | None = None
+
+    price_egp: float | None = None
+    price_usd: float | None = None
+
+    m4_type: str | None = None
+    m4_level: int | None = None
+    m4_is_max: bool | None = False
+
+    cars_total: int | None = None
+    cars_mythic: int | None = None
+    has_airdrop_car: bool | None = False
+
+    has_internal_link: bool | None = False
+    has_twitter_link: bool | None = False
+    is_facebook_disabled: bool | None = False
+    has_trusted_middleman: bool | None = False
+    linkage_type: str | None = "unknown"
+
+    canonical_items: list[str] = Field(default_factory=list)
+    extracted_items_str: str | None = ""
+    active_combos_str: str | None = ""
+
+    prestige_score: float | None = 0.0
+    rarity_score: float | None = 0.0
+    combo_multiplier: float | None = 1.0
+
     class Config:
         arbitrary_types_allowed = True

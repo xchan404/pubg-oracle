@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: end-of-file-fixer
+        exclude: \.(pkl|db|session)$
+      - id: trailing-whitespace
+        exclude: \.(pkl|db|session)$
+      - id: check-merge-conflict
+
+  - repo: local
+    hooks:
+      - id: no-secrets
+        name: block .env and session files from commits
+        entry: git diff --cached --name-only --diff-filter=ACM
+        language: system
+        pass_filenames: true
+        files: (^\.env$|\.session$)

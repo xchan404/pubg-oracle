@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 إعدادات وتكوين نظام سحب بيانات تلجرام (PUBG Scraper Config)
 يقوم هذا الملف بتحميل متغيرات البيئة، وضمان وجود هيكل المجلدات المطلوب،
@@ -8,6 +7,7 @@
 import os
 import re
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # تحميل متغيرات البيئة من ملف .env
@@ -26,8 +26,8 @@ if not API_ID_RAW or not API_HASH:
 
 try:
     API_ID = int(API_ID_RAW)
-except ValueError:
-    raise ValueError("خطأ: يجب أن يكون TELEGRAM_API_ID عبارة عن أرقام فقط.")
+except ValueError as api_id_err:
+    raise ValueError("خطأ: يجب أن يكون TELEGRAM_API_ID عبارة عن أرقام فقط.") from api_id_err
 
 API_HASH = str(API_HASH).strip()
 
@@ -64,15 +64,15 @@ ensure_directories()
 def parse_channel_input(channel_input: str) -> dict:
     """
     تقوم بتحليل رابط القناة وتحديد ما إذا كان عاماً (username) أو خاصاً (invite link).
-    
+
     المعاملات:
         channel_input (str): رابط القناة أو معرفها (مثال: https://t.me/sa3kgaming1 أو https://t.me/+hash)
-        
+
     المخرجات:
         dict: يحتوي على نوع الرابط والقيمة المستخرجة واسم فريد للملفات.
     """
     channel_input = channel_input.strip()
-    
+
     # 1. التحقق من روابط الدعوة للقنوات الخاصة (Private Invite Links)
     # الصيغ الممكنة: https://t.me/+hash أو t.me/+hash أو https://t.me/joinchat/hash
     invite_match = re.search(r"(?:t\.me\/joinchat\/|t\.me\/\+)([a-zA-Z0-9_\-]+)", channel_input)
@@ -87,7 +87,7 @@ def parse_channel_input(channel_input: str) -> dict:
             "file_name": file_friendly_name,
             "raw_input": channel_input
         }
-        
+
     # 2. التحقق من الروابط العامة (Public Channel Links/Usernames)
     # الصيغ الممكنة: https://t.me/username أو t.me/username أو @username أو username فقط
     username_match = re.search(r"(?:t\.me\/|@)([a-zA-Z0-9_]{4,})", channel_input)
@@ -100,7 +100,7 @@ def parse_channel_input(channel_input: str) -> dict:
             "file_name": username,
             "raw_input": channel_input
         }
-        
+
     # 3. إذا تم إدخال المعرف مباشرة كاسم بدون إضافات
     if re.match(r"^[a-zA-Z0-9_]{4,}$", channel_input):
         return {
@@ -110,7 +110,7 @@ def parse_channel_input(channel_input: str) -> dict:
             "file_name": channel_input,
             "raw_input": channel_input
         }
-        
+
     # في حال لم يطابق المعايير (افتراض أنه معرف عام)
     clean_name = re.sub(r"[^a-zA-Z0-9_]", "_", channel_input)
     return {

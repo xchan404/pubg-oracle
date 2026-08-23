@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 PUBG Market Intelligence - Market Trends & Price Analytics Engine
 Computes item frequency, price distributions, rarity heatmaps,
@@ -7,12 +6,12 @@ and market demand signals from historical parsed account data.
 
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Any
 
+import pandas as pd
 
 CSV_PATH = os.path.join('data', 'parsed', 'csv', 'all_parsed_accounts.csv')
 
@@ -64,7 +63,7 @@ class MarketTrendsEngine:
             self._df = pd.read_csv(self.csv_path, low_memory=False)
         return self._df
 
-    def get_market_summary(self) -> Dict[str, Any]:
+    def get_market_summary(self) -> dict[str, Any]:
         """Returns a high-level market overview."""
         data = self.df
         priced = data[data['price_egp'].notna() & (data['price_egp'] > 0)]
@@ -81,7 +80,7 @@ class MarketTrendsEngine:
             "channels": data['channel_username'].value_counts().head(10).to_dict(),
         }
 
-    def get_price_distribution(self, bins: int = 10) -> Dict[str, Any]:
+    def get_price_distribution(self, bins: int = 10) -> dict[str, Any]:
         """Returns price distribution breakdown across segments."""
         priced = self.df[self.df['price_egp'].notna() & (self.df['price_egp'] > 0) & (self.df['price_egp'] < 200000)]
 
@@ -107,7 +106,7 @@ class MarketTrendsEngine:
             }
         }
 
-    def get_item_frequency(self) -> List[Dict[str, Any]]:
+    def get_item_frequency(self) -> list[dict[str, Any]]:
         """Returns item frequency counts and percentage across all listings."""
         data = self.df
         total = len(data)
@@ -126,7 +125,7 @@ class MarketTrendsEngine:
         items.sort(key=lambda x: x['count'], reverse=True)
         return items
 
-    def get_m4_type_distribution(self) -> List[Dict[str, Any]]:
+    def get_m4_type_distribution(self) -> list[dict[str, Any]]:
         """Returns M4 skin type distribution."""
         data = self.df
         m4_data = data[data['m4_type'].notna() & (data['m4_type'] != '')]
@@ -146,13 +145,13 @@ class MarketTrendsEngine:
         dist.sort(key=lambda x: x['count'], reverse=True)
         return dist
 
-    def get_item_price_impact(self) -> List[Dict[str, Any]]:
+    def get_item_price_impact(self) -> list[dict[str, Any]]:
         """
         Calculates the average price uplift for each rare item.
         Compares median price of accounts WITH the item vs accounts WITHOUT.
         """
         priced = self.df[self.df['price_egp'].notna() & (self.df['price_egp'] > 0) & (self.df['price_egp'] < 200000)]
-        baseline_median = priced['price_egp'].median()
+        priced['price_egp'].median()
 
         impacts = []
         for col, label in ITEM_COLUMNS.items():
@@ -182,7 +181,7 @@ class MarketTrendsEngine:
         impacts.sort(key=lambda x: x['price_uplift_egp'], reverse=True)
         return impacts
 
-    def get_rarity_demand_heatmap(self) -> List[Dict[str, Any]]:
+    def get_rarity_demand_heatmap(self) -> list[dict[str, Any]]:
         """
         Generates a rarity × demand heatmap for each item.
         Rarity = inverse of frequency. Demand = price uplift when present.
@@ -213,7 +212,7 @@ class MarketTrendsEngine:
         heatmap.sort(key=lambda x: (x['rarity_score'] + x['demand_score']), reverse=True)
         return heatmap
 
-    def get_full_report(self) -> Dict[str, Any]:
+    def get_full_report(self) -> dict[str, Any]:
         """Returns the complete market trends report."""
         return {
             "market_summary": self.get_market_summary(),
@@ -230,7 +229,7 @@ trends_engine = MarketTrendsEngine()
 
 
 if __name__ == "__main__":
-    import io, json
+    import io
     if hasattr(sys.stdout, 'buffer'):
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
@@ -247,24 +246,24 @@ if __name__ == "__main__":
     print(f"  Median Price          : {summary['median_price_egp']:,.0f} EGP")
 
     dist = engine.get_price_distribution()
-    print(f"\n--- Price Segments ---")
+    print("\n--- Price Segments ---")
     for seg, count in dist['segments'].items():
         print(f"  {seg:20s}: {count:,}")
 
-    print(f"\n--- Item Frequency (Top 15) ---")
+    print("\n--- Item Frequency (Top 15) ---")
     for item in engine.get_item_frequency()[:15]:
         print(f"  {item['item']:25s}: {item['count']:,} ({item['percentage']}%)")
 
-    print(f"\n--- M4 Skin Distribution ---")
+    print("\n--- M4 Skin Distribution ---")
     for m4 in engine.get_m4_type_distribution():
         print(f"  {m4['type']:15s}: {m4['count']:,} ({m4['percentage']}%)")
 
-    print(f"\n--- Item Price Impact (Top 10) ---")
+    print("\n--- Item Price Impact (Top 10) ---")
     for imp in engine.get_item_price_impact()[:10]:
         print(f"  {imp['item']:25s}: +{imp['price_uplift_egp']:,.0f} EGP ({imp['price_uplift_pct']:+.1f}%) | "
               f"With: {imp['median_price_with']:,.0f} vs Without: {imp['median_price_without']:,.0f}")
 
-    print(f"\n--- Rarity x Demand Heatmap ---")
+    print("\n--- Rarity x Demand Heatmap ---")
     for h in engine.get_rarity_demand_heatmap():
         print(f"  [{h['signal']:4s}] {h['item']:25s}: Rarity={h['rarity_score']:.0f} | Demand={h['demand_score']:.0f} | Uplift={h['price_uplift_egp']:+,.0f} EGP")
 

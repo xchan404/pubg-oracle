@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Database Manager (SQLAlchemy)
 Handles connection to SQLite (or Postgres) and provides helper methods.
 """
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from database.models import Base, RawMessage, ParsedAccount, Channel, MarketStat
-from config import DB_PATH, DATABASE_URL
 import logging
 from datetime import datetime
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from config import DATABASE_URL, DB_PATH
+from database.models import Base, RawMessage
 
 logger = logging.getLogger("pubg_scraper")
 
@@ -29,7 +30,7 @@ def init_db():
     """
     try:
         Base.metadata.create_all(bind=engine)
-        
+
         # Also create checkpoints table using raw SQL for backwards compatibility
         # since it's only used by the scraper internally
         with engine.begin() as conn:
@@ -72,7 +73,7 @@ def save_message(conn, msg: dict) -> bool:
             RawMessage.channel_username == msg["channel_username"],
             RawMessage.message_id == msg["message_id"]
         ).first()
-        
+
         if not exists:
             new_msg = RawMessage(
                 message_id=msg["message_id"],
@@ -125,5 +126,5 @@ def get_checkpoint(conn, channel_username: str) -> int:
         if row:
             return row[0]
         return 0
-    except Exception as e:
+    except Exception:
         return 0

@@ -1,8 +1,9 @@
-import os
-import sys
-import io
-import re
 import asyncio
+import io
+import os
+import re
+import sys
+
 from aiohttp import web
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
@@ -12,10 +13,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-from parser.regex_parser import parse_account_data
+from database.ads import initialize as init_ads_db
+from database.ads import save_ad
 from ml.predict import EnsemblePricer
-from db.database import save_ad
-from parser.aliases import resolve_alias
+from parser.regex_parser import parse_account_data
 
 load_dotenv()
 
@@ -63,44 +64,45 @@ def escape_html(text):
 
 from ml.pipeline import pipeline_instance
 
+
 def price_text(text):
     """يسعر نص الإعلان ويرجع تقرير HTML"""
     parsed = pipeline_instance.process(text)
     asking_price = parsed.get('price_egp')
-    
+
     res = pricer.predict(parsed, asking_price=asking_price)
-    combo_mult = parsed.get("combo_multiplier", 1.0)
-    adjusted_fair_value = res['fair_value_egp'] * combo_mult
-    
+    fair_value = res['fair_value_egp']
+
     adv = res.get('flipping_advice', {})
     rating = adv.get('deal_rating', '❓')
 
-    msg  = f"🤖 <b>تقرير التسعير بالذكاء الاصطناعي (محدث)</b>\n\n"
+    msg  = "🤖 <b>تقرير التسعير بالذكاء الاصطناعي (محدث)</b>\n\n"
     if asking_price and asking_price > 100:
-        profit = (adv.get('target_sell_price') * intel["combo_multiplier"]) - asking_price
+        profit = adv.get('target_sell_price', 0) - asking_price
         msg += f"💰 <b>المطلوب:</b> {asking_price} ج.م\n"
-        msg += f"⚖️ <b>السعر العادل:</b> {adjusted_fair_value:.0f} ج.م\n"
-        msg += f"💵 <b>هدف البيع:</b> {adv.get('target_sell_price') * intel['combo_multiplier']:.0f} ج.م\n"
+        msg += f"⚖️ <b>السعر العادل:</b> {fair_value:.0f} ج.م\n"
+        msg += f"💵 <b>هدف البيع:</b> {adv.get('target_sell_price', 0):.0f} ج.م\n"
         msg += f"📈 <b>المكسب المتوقع:</b> {profit:.0f} ج.م\n"
         msg += f"🏷️ <b>التقييم:</b> {rating}\n\n"
     else:
-        msg += f"⚖️ <b>السعر العادل التقديري:</b> {adjusted_fair_value:.0f} ج.م\n"
-        msg += f"⚠️ <i>لم يتم العثور على سعر مطلوب.</i>\n\n"
+        msg += f"⚖️ <b>السعر العادل التقديري:</b> {fair_value:.0f} ج.م\n"
+        msg += "⚠️ <i>لم يتم العثور على سعر مطلوب.</i>\n\n"
 
     # --- التفاصيل الإضافية ---
     msg += f"🎯 <b>دقة التقييم:</b> {escape_html(res.get('confidence', {}).get('label', ''))}\n"
     msg += f"📊 <b>الشريحة:</b> {escape_html(res['segment'])}\n"
-    msg += f"✨ <b>البريستيج:</b> {intel['prestige_score']} نقطة\n"
-    if intel["active_combos"]:
-        msg += f"🔥 <b>كومبوهات:</b> {', '.join(intel['active_combos'])}\n"
-    
-    msg += f"\n📂 <b>ملخص الحساب المستخرج:</b>\n"
+    msg += f"✨ <b>البريستيج:</b> {parsed.get('prestige_score', 0)} نقطة\n"
+    active_combos = parsed.get("active_combos") or []
+    if active_combos:
+        msg += f"🔥 <b>كومبوهات:</b> {', '.join(active_combos)}\n"
+
+    msg += "\n📂 <b>ملخص الحساب المستخرج:</b>\n"
     msg += f"🔸 <b>المستوى:</b> {parsed.get('account_level') or 'غير معروف'}\n"
     msg += f"🔸 <b>الميثك:</b> {parsed.get('mythics_count') or 0}\n"
     msg += f"🔸 <b>أسلحة التطوير:</b> {parsed.get('guns_count') or 0}\n"
     if parsed.get('cars_mythic') and parsed['cars_mythic'] > 0:
         msg += f"🏎️ <b>السيارات الميثيك:</b> {parsed['cars_mythic']}\n"
-    
+
     if parsed.get('m4_type'):
         max_str = '(ماكس)' if parsed.get('m4_is_max') else f"(لفل {parsed.get('m4_level')})"
         msg += f"🔫 <b>امفور 1:</b> {parsed.get('m4_type')} {max_str}\n"
@@ -110,7 +112,7 @@ def price_text(text):
     if parsed.get('m4_3_type'):
         max_str3 = '(ماكس)' if parsed.get('m4_3_is_max') else f"(لفل {parsed.get('m4_3_level')})"
         msg += f"🔫 <b>امفور 3:</b> {parsed.get('m4_3_type')} {max_str3}\n"
-        
+
     rare_found = []
     if parsed.get('has_mummy_helmet'): rare_found.append('خوذة مومياء')
     elif parsed.get('has_mummy'): rare_found.append('مومياء')
@@ -123,55 +125,54 @@ def price_text(text):
     if parsed.get('has_car_porsche'): rare_found.append('بورش')
     if parsed.get('has_car_dodge'): rare_found.append('دودج')
     if parsed.get('has_lobby_mythic'): rare_found.append('لوبي ميثك')
-    
+
     # Extra Ultra Rares
     if parsed.get('has_soap_double'): rare_found.append('دبل صابونة')
     elif parsed.get('has_soap_blue'): rare_found.append('صابونة زرقاء')
     elif parsed.get('has_soap_black'): rare_found.append('صابونة سوداء')
     elif parsed.get('has_soap_rare'): rare_found.append('صابونة نادرة')
-    
+
     if parsed.get('has_scarf_tiger'): rare_found.append('وشاح النمر')
     if parsed.get('has_hair_qarnain'): rare_found.append('شعر قرنين')
     if parsed.get('has_hair_kaboria'): rare_found.append('شعر كابوريا')
     if parsed.get('has_hair_yellow'): rare_found.append('شعر أصفر')
-    
+
     if parsed.get('has_plane_frame'): rare_found.append('إطار طيارة')
     if parsed.get('has_re2_frame'): rare_found.append('إطار RE2')
     if parsed.get('has_conqueror_frame'): rare_found.append('إطار كونكر')
-    
+
     if rare_found:
         msg += f"💎 <b>النوادر:</b> {', '.join(rare_found)}\n"
 
     return msg
 
 
-def format_deal_message(res, original_text, chat_title, msg_link, intel=None, parsed=None):
+def format_deal_message(res, original_text, chat_title, msg_link, parsed=None):
     adv = res.get('flipping_advice', {})
     rating = adv.get('deal_rating', '❓')
-    
-    if intel is None:
-        intel = {"combo_multiplier": 1.0, "active_combos": [], "prestige_score": 0}
-        
-    adjusted_fair_value = res['fair_value_egp'] * intel["combo_multiplier"]
-    profit = (adv.get('target_sell_price', 0) * intel["combo_multiplier"]) - adv.get('asking_price', 0)
 
-    msg = f"🎯 <b>صيدة جديدة من الجروبات!</b> 🎯\n"
+    fair_value = res['fair_value_egp']
+    profit = adv.get('target_sell_price', 0) - adv.get('asking_price', 0)
+
+    msg = "🎯 <b>صيدة جديدة من الجروبات!</b> 🎯\n"
     msg += f"📍 <b>الجروب:</b> {escape_html(chat_title)}\n"
     msg += f"🔗 <b>رابط الرسالة:</b> {msg_link}\n\n"
 
     msg += f"💰 <b>المطلوب:</b> {adv.get('asking_price')} ج.م\n"
-    msg += f"⚖️ <b>السعر العادل:</b> {adjusted_fair_value:.0f} ج.م\n"
-    msg += f"💵 <b>هدف البيع:</b> {adv.get('target_sell_price', 0) * intel['combo_multiplier']:.0f} ج.م\n"
+    msg += f"⚖️ <b>السعر العادل:</b> {fair_value:.0f} ج.م\n"
+    msg += f"💵 <b>هدف البيع:</b> {adv.get('target_sell_price', 0):.0f} ج.م\n"
     msg += f"📈 <b>المكسب المتوقع:</b> {profit:.0f} ج.م\n"
     msg += f"🏷️ <b>التقييم:</b> {rating}\n\n"
 
     msg += f"🎯 <b>الثقة:</b> {escape_html(res.get('confidence', {}).get('label', ''))}\n"
     msg += f"📊 <b>الشريحة:</b> {escape_html(res['segment'])}\n"
-    if intel["active_combos"]:
-        msg += f"🔥 <b>كومبوهات:</b> {', '.join(intel['active_combos'])}\n"
-        
+
+    active_combos = (parsed or {}).get("active_combos") or []
+    if active_combos:
+        msg += f"🔥 <b>كومبوهات:</b> {', '.join(active_combos)}\n"
+
     if parsed:
-        msg += f"\n📂 <b>مستخرجات سريعة:</b>\n"
+        msg += "\n📂 <b>مستخرجات سريعة:</b>\n"
         msg += f"🔸 المستوى: {parsed.get('account_level') or '?'} | الميثك: {parsed.get('mythics_count') or 0} | الأسلحة: {parsed.get('guns_count') or 0}\n"
         if parsed.get('m4_type'):
             max_str = '(ماكس)' if parsed.get('m4_is_max') else f"(L{parsed.get('m4_level')})"
@@ -183,7 +184,7 @@ def format_deal_message(res, original_text, chat_title, msg_link, intel=None, pa
                 max_str3 = '(ماكس)' if parsed.get('m4_3_is_max') else f"(L{parsed.get('m4_3_level')})"
                 msg += f" | {parsed.get('m4_3_type')} {max_str3}"
             msg += "\n"
-            
+
         rare_found = []
         if parsed.get('has_mummy_helmet'): rare_found.append('خوذة مومياء')
         elif parsed.get('has_mummy'): rare_found.append('مومياء')
@@ -207,7 +208,7 @@ def format_deal_message(res, original_text, chat_title, msg_link, intel=None, pa
         if parsed.get('has_plane_frame'): rare_found.append('إطار طيارة')
         if parsed.get('has_re2_frame'): rare_found.append('إطار RE2')
         if parsed.get('has_conqueror_frame'): rare_found.append('إطار كونكر')
-        
+
         if rare_found:
             msg += f"💎 النوادر: {', '.join(rare_found)}\n"
 
@@ -224,7 +225,7 @@ async def bot_handler(event):
     """يراقب الرسايل اللي بتبعتها للبوت ويرد عليها بالتسعير"""
     if not event.is_private:
         return
-        
+
     text = event.text
     if not text:
         return
@@ -282,10 +283,10 @@ async def sniper_handler(event):
             print("❌ [تجاهل] لم يتم العثور على سعر واضح في الإعلان.")
             return
 
-        res = pricer.predict(text)
+        res = pricer.predict(text, asking_price=asking_price)
         fair_value = res.get('fair_value_egp', 0)
         segment = res.get('segment', 'Unknown')
-        
+
         profit = 0
         if asking_price and fair_value > 0:
             profit = fair_value - asking_price
@@ -301,11 +302,12 @@ async def sniper_handler(event):
             segment=segment,
             parsed_data=parsed
         )
-        
+
         if not is_new:
             return  # الإعلان مكرر وتم حفظه مسبقاً
 
-        if profit >= MIN_PROFIT or '🔥🔥' in res.get('confidence', {}).get('label', ''):
+        deal_rating = res.get('flipping_advice', {}).get('deal_rating', '')
+        if profit >= MIN_PROFIT or '🔥🔥' in deal_rating:
             chat = await event.get_chat()
             chat_title = getattr(chat, 'title', 'محادثة خاصة')
 
@@ -317,7 +319,7 @@ async def sniper_handler(event):
             else:
                 msg_link = f"https://t.me/c/{chat_id_str}/{event.id}"
 
-            report = format_deal_message(res, text, chat_title, msg_link, intel=None, parsed=parsed)
+            report = format_deal_message(res, text, chat_title, msg_link, parsed=parsed)
             print(f"🚀 [صيدة!] المطلوب: {asking_price} | العادل: {fair_value:.0f} | المكسب: {profit:.0f} ج.م")
 
             await bot_client.send_message(MY_CHAT_ID, report, parse_mode='html')
@@ -348,15 +350,18 @@ async def start_web_server():
 
 async def main():
     print("\n[+] يتم الآن الاتصال بحساب تليجرام وحساب البوت...")
-    
+
+    # تهيئة قاعدة البيانات الموحدة + ترحيل بيانات sniper.db القديمة إن وجدت
+    init_ads_db()
+
     # بدء كلا الحسابين
     await start_web_server()
     await client.start()
     await bot_client.start(bot_token=BOT_TOKEN)
-    
+
     print("[+] السنايبر شغال وبيراقب الجروبات... 🦅")
     print(f"[+] التنبيهات والردود عبر البوت (Chat ID: {MY_CHAT_ID})")
-    
+
     # تشغيل الحدثين (Event Loops) معاً
     await asyncio.gather(
         client.run_until_disconnected(),

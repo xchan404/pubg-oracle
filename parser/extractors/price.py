@@ -1,45 +1,46 @@
-# -*- coding: utf-8 -*-
 """
 Price Extractor Module
 Extracts EGP and USD prices with support for k/K notation and Arabic thousand multipliers.
 """
 
 import re
-from typing import Dict, Any, Optional, Tuple
+from typing import Any
+
 from parser.extractors.base import BaseExtractor
+
 
 class PriceExtractor(BaseExtractor):
     @staticmethod
-    def parse_numeric_value(raw_val: str) -> Optional[float]:
+    def parse_numeric_value(raw_val: str) -> float | None:
         """Converts strings like '15k', '15.5k', '15 الف', '15,000' to float."""
         if not raw_val:
             return None
         val_str = raw_val.strip().lower()
-        
+
         k_match = re.search(r'(\d[\d,\.]*)\s*k\b', val_str, re.IGNORECASE)
         if k_match:
             try:
                 return float(k_match.group(1).replace(',', '')) * 1000.0
             except ValueError:
                 pass
-                
+
         thousand_match = re.search(r'(\d[\d,\.]*)\s*(?:ألف|الف)\b', val_str, re.IGNORECASE)
         if thousand_match:
             try:
                 return float(thousand_match.group(1).replace(',', '')) * 1000.0
             except ValueError:
                 pass
-                
+
         plain_match = re.search(r'(\d[\d,\.]*)', val_str)
         if plain_match:
             try:
                 return float(plain_match.group(1).replace(',', ''))
             except ValueError:
                 pass
-                
+
         return None
 
-    def extract_prices(self, text: str) -> Tuple[Optional[float], Optional[float]]:
+    def extract_prices(self, text: str) -> tuple[float | None, float | None]:
         price_egp, price_usd = None, None
 
         usd_match = re.search(r'(?:\$\s*(\d[\d,\.]*)|(\d[\d,\.]*)\s*\$)', text)
@@ -90,7 +91,7 @@ class PriceExtractor(BaseExtractor):
 
         return price_egp, price_usd
 
-    def extract(self, text: str) -> Dict[str, Any]:
+    def extract(self, text: str) -> dict[str, Any]:
         price_egp, price_usd = self.extract_prices(text)
         return {
             "price_egp": price_egp,

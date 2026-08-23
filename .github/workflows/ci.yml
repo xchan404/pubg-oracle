@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type check (mypy — core modules)
+        run: mypy ml/rules_engine.py ml/predict.py schemas/ database/
+      - name: Tests
+        run: pytest tests/ -v
+
+      - name: Guard secrets
+        run: |
+          if git ls-files | grep -E '(^\.env$|\.session$)'; then
+            echo "::error::Secrets or session files are tracked in git!"; exit 1
+          fi

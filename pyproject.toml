@@ -1,0 +1,64 @@
+[project]
+name = "pubg-market-intelligence"
+version = "2.0.0"
+description = "PUBG Mobile account market intelligence: scraping, parsing, ML pricing, sniper bot, and dashboard API"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["archive", "__pycache__", "catboost_info"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear (common bugs)
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # long lines in Arabic messages/regexes are unavoidable
+    "E701",  # compact `if x: stmt` style used across bot formatting
+    "B008",  # FastAPI dependency pattern uses function calls in defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Entry modules bootstrap sys.path before importing project packages (intentional)
+"api/main.py" = ["E402"]
+"bot/telegram_bot.py" = ["E402"]
+"ml/predict.py" = ["E402"]
+"ml/retrain_service.py" = ["E402"]
+"intelligence/trends.py" = ["E402"]
+"db/database.py" = ["E402"]
+"tests/*" = ["E402"]
+
+# Legacy analysis scripts kept for reference; not part of quality gates
+"process_data.py" = ["ALL"]
+"eda.py" = ["ALL"]
+"analyze_impact.py" = ["ALL"]
+"login.py" = ["ALL"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = ["archive/", "catboost_info/"]
+# Gradual typing: start lenient, tighten per-module over time
+check_untyped_defs = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["ml.rules_engine", "ml.predict", "schemas.*", "database.*"]
+disallow_untyped_defs = false
+
+# Legacy regex monolith: full type hardening lands with the Phase 1 parser rewrite
+[[tool.mypy.overrides]]
+module = ["parser.*", "intelligence.*"]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Automated Retraining & Drift Monitor Service
 Monitors dataset growth in data/parsed/csv/all_parsed_accounts.csv,
@@ -7,16 +6,17 @@ triggers model retraining via subprocess, evaluates post-training MAE,
 and logs all training events in models/retrain_history.json.
 """
 
-import os
-import sys
+import argparse
 import io
 import json
-import argparse
+import os
 import subprocess
-from datetime import datetime, timezone
-import pandas as pd
-import numpy as np
+import sys
+from datetime import UTC, datetime
+
 import joblib
+import numpy as np
+import pandas as pd
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,11 +46,38 @@ def load_meta() -> dict:
     """Loads training meta JSON if exists, else returns defaults."""
     if os.path.exists(META_PATH):
         try:
-            with open(META_PATH, 'r', encoding='utf-8') as f:
+            with open(META_PATH, encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             print(f"[WARN] Failed to read training_meta.json: {e}")
     return {"last_training_rows": 0, "last_training_date": None, "last_mae": None}
+
+
+def save_meta(meta: dict) -> None:
+    """Persists training metadata to models/training_meta.json."""
+    try:
+        with open(META_PATH, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[ERROR] Failed to write training_meta.json: {e}")
+
+
+def log_event(event: dict) -> None:
+    """Appends a structured event to models/retrain_history.json."""
+    history = []
+    if os.path.exists(HISTORY_PATH):
+        try:
+            with open(HISTORY_PATH, encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    history.append(event)
+    try:
+        with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+        print(f"[INFO] Event logged -> {os.path.basename(HISTORY_PATH)} ({event.get('status', 'unknown')})")
+    except Exception as e:
+        print(f"[ERROR] Failed to append retrain history: {e}")
 
 
 def calculate_psi(baseline: pd.Series, current: pd.Series, num_buckets: int = 10) -> float:
@@ -119,7 +146,7 @@ def get_mlops_telemetry() -> dict:
     history = []
     if os.path.exists(HISTORY_PATH):
         try:
-            with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+            with open(HISTORY_PATH, encoding='utf-8') as f:
                 history = json.load(f)
         except Exception:
             history = []
@@ -186,7 +213,7 @@ def evaluate_mae(csv_path: str, models_dir: str, sample_size: int = 1000) -> flo
         X_base[f'cluster_{i}'] = (cluster_ids == i).astype(int)
 
     # TF-IDF features
-    for feat_name, idx in zip(tfidf_features_list, tfidf_indices):
+    for feat_name, idx in zip(tfidf_features_list, tfidf_indices, strict=False):
         if idx < tfidf_matrix.shape[1]:
             X_base[feat_name] = tfidf_matrix[:, idx]
         else:
@@ -252,7 +279,7 @@ def run_retrain_service(check_only: bool = False, force: bool = False, threshold
         print("-" * 50)
 
         log_event({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "trigger": "check",
             "dataset_rows": current_rows,
             "new_rows_since_last": new_rows,
@@ -266,7 +293,7 @@ def run_retrain_service(check_only: bool = False, force: bool = False, threshold
     if not retrain_needed:
         print("\n[INFO] New listings count does not meet threshold. Retraining skipped.")
         log_event({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "trigger": "scheduled_check",
             "dataset_rows": current_rows,
             "new_rows_since_last": new_rows,
@@ -283,12 +310,12 @@ def run_retrain_service(check_only: bool = False, force: bool = False, threshold
     print(f"[CMD] {sys.executable} {TRAIN_SCRIPT_PATH}")
 
     try:
-        res = subprocess.run([sys.executable, TRAIN_SCRIPT_PATH], cwd=PROJECT_ROOT, check=True)
+        subprocess.run([sys.executable, TRAIN_SCRIPT_PATH], cwd=PROJECT_ROOT, check=True)
         print("\n[INFO] Retraining subprocess completed successfully!")
     except subprocess.CalledProcessError as e:
         print(f"\n[ERROR] Model retraining subprocess failed with code {e.returncode}")
         log_event({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "trigger": trigger_type,
             "dataset_rows": current_rows,
             "new_rows_since_last": new_rows,
@@ -312,7 +339,7 @@ def run_retrain_service(check_only: bool = False, force: bool = False, threshold
         new_mae = 0.0
 
     # Step 5: Save metadata and log event
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     save_meta({
         "last_training_rows": current_rows,
         "last_training_date": now_iso,

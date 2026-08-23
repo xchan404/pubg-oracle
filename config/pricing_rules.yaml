@@ -1,0 +1,265 @@
+# =====================================================================
+# PUBG Market Intelligence — Pricing Business Rules (v1)
+# ---------------------------------------------------------------------
+# Extracted verbatim from ml/predict.py (Phase 0 refactor).
+# Every number below preserves the exact current production behavior.
+# Edit values here to retune pricing without touching Python code.
+# Condition types:
+#   feature : {name, op, value}        -> compares a feature/derived column
+#                                         (ops: eq, neq, gt, gte, lt, lte,
+#                                          truthy, not_null, in)
+#   regex   : {pattern, flags, on}     -> searches text ("text" by default)
+#   any_of / all_of / not                  -> combinators
+# =====================================================================
+version: 1
+currency: EGP
+
+# ── Ensemble blending (per price segment) ────────────────────────────
+blend:
+  # Selected by LightGBM's own estimate (kept identical to legacy logic)
+  cheap:
+    when: {feature: {name: lgb_price, op: lt, value: 15000}}
+    weights: {lightgbm: 0.6, catboost: 0.4}
+    segment: "Economy/Mid-Tier (<15k)"
+    confidence_margin: 1200
+  expensive:
+    when: {feature: {name: lgb_price, op: gte, value: 15000}}
+    weights: {xgboost: 0.7, catboost: 0.3}
+    segment: "Whale/Expensive (>=15k)"
+    confidence_margin: 3200
+
+# ── Rare-item premiums (summed into rare_premium) ────────────────────
+rare_premiums:
+  - id: joker_fox_locked
+    description: "Joker Fox closed/locked (open variant handled by ML base)"
+    amount: 1500
+    when:
+      all_of:
+        - {feature: {name: has_joker_fox, op: eq, value: 1}}
+        - any_of:
+            - {feature: {name: has_joker_fox_locked, op: eq, value: 1}}
+            - {regex: {pattern: 'مقفول'}}
+
+  - id: mummy_helmet
+    description: "Mummy helmet (Inferno Rider / Hell Helmet) — matches Joker Fox value"
+    amount: 1500
+    when: {feature: {name: has_mummy_helmet, op: eq, value: 1}}
+
+  - id: xsuit_upgraded
+    description: "Upgraded X-Suit (kill/max/level marker near suit keyword or named suit) — legacy if/elif, fires once"
+    amount: 1500
+    when:
+      all_of:
+        - {feature: {name: has_xsuit, op: eq, value: 1}}
+        - any_of:
+            - {regex: {pattern: '(?:بدل[هةات]*|لبس[هةات]*|اكس|x|xsuit)[\s\S]{0,30}?(?:كيل|ماكس|لفل\s*[4-7]|level\s*[4-7])', flags: IGNORECASE}}
+            - {regex: {pattern: '(?:الغراب|فرعون|بوسايدون|سيلفانوس|انوبيس|الجوكر|الموميا|لفينكيسترا)[\s\S]{0,30}?(?:كيل|ماكس|لفل\s*[4-7])', flags: IGNORECASE}}
+
+  - id: plane_frame_vintage_flag
+    description: "Plane frame present + gold/silver/2018 marker"
+    amount: 500
+    when:
+      all_of:
+        - {feature: {name: has_plane_frame, op: eq, value: 1}}
+        - {regex: {pattern: 'فضي|ذهبي|دهبي|2018'}}
+
+  - id: plane_frame_vintage_regex_only
+    description: "Plane-frame wording + gold/silver/2018 (frame flag absent)"
+    amount: 500
+    when:
+      all_of:
+        - {not: {feature: {name: has_plane_frame, op: eq, value: 1}}}
+        - {regex: {pattern: 'طيار', flags: IGNORECASE}}
+        - {regex: {pattern: 'فضي|ذهبي|دهبي|2018'}}
+
+  - id: re2_frame_flag
+    description: "RE2/Godzilla frame (flag present)"
+    amount: 300
+    when: {feature: {name: has_re2_frame, op: eq, value: 1}}
+
+  - id: re2_frame_regex
+    description: "RE2/Godzilla frame (wording only)"
+    amount: 300
+    when: {regex: {pattern: 're2|جودزيلا', flags: IGNORECASE}}
+
+  - id: old_season_avatars
+    description: "Old-season avatars (S2/S3 harvester/climber)"
+    amount: 1500
+    when: {regex: {pattern: 'حاصد|متسلق|s2\b|s3\b|الموسم\s*(?:التاني|الثاني)', flags: IGNORECASE}}
+
+  - id: girl_face_wording
+    description: "Girl-face wording"
+    amount: 500
+    when: {regex: {pattern: 'فيس\s*بنت|فيس\s*البنت', flags: IGNORECASE}}
+
+  - id: qarnain_hair
+    description: "Qarnain hair"
+    amount: 300
+    when: {regex: {pattern: 'شعر\s*القرنين'}}
+
+  - id: blue_soap
+    description: "Blue soap"
+    amount: 300
+    when: {regex: {pattern: 'صابونه\s*زرقا|الصابونه\s*الزرقا'}}
+
+  - id: tiger_scarf
+    description: "Tiger scarf"
+    amount: 200
+    when: {regex: {pattern: 'وشاح\s*النمر'}}
+
+  - id: kaboria
+    description: "Kaboria (crab) item"
+    amount: 200
+    when: {regex: {pattern: 'كابوريا|الكابوريا'}}
+
+  - id: gold_suit_head
+    description: "Gold suit / gold head"
+    amount: 400
+    when: {regex: {pattern: 'بدلة\s*جولد|راس\s*جولد'}}
+
+  - id: crow_bag
+    description: "Crow (raven) bag"
+    amount: 300
+    when: {regex: {pattern: 'شنطة\s*الغراب|شنطه\s*الغراب'}}
+
+  - id: mythic_cars
+    description: "Mythic cars: 1500 for first + 1000 per additional"
+    when: {feature: {name: _has_mythic_car, op: truthy}}
+    formula:
+      base: 1500
+      per_extra_unit: 1000
+      count_feature: cars_mythic
+      default_count: 1
+
+# ── Stat premiums (raw stats; summed on top of rare_premium) ─────────
+stat_premiums:
+  - id: m4_level_tier
+    description: "Upgrade-tier premium by M4 level (legacy if/elif order, first match wins)"
+    ladder_first_match: true
+    ladder:
+      - {when: {feature: {name: m4_level_raw, op: eq, value: 4}}, amount: 500}
+      - {when: {all_of: [{feature: {name: m4_level_raw, op: gt, value: 4}},
+                         {feature: {name: m4_is_max, op: eq, value: 0, must_exist: true}}]}, amount: 800}
+      - {when: {feature: {name: m4_is_max, op: eq, value: 1}}, amount: 1500}
+
+  - id: mythics_ladder
+    description: "Bulk mythics premium (first matching tier wins)"
+    ladder_first_match: true
+    ladder:
+      - {when: {feature: {name: mythics_count, op: gte, value: 100}}, amount: 1000}
+      - {when: {feature: {name: mythics_count, op: gte, value: 70}}, amount: 500}
+      - {when: {feature: {name: mythics_count, op: gte, value: 50}}, amount: 300}
+
+  - id: guns_ladder
+    description: "Bulk upgraded-guns premium (first matching tier wins)"
+    ladder_first_match: true
+    ladder:
+      - {when: {feature: {name: guns_count, op: gte, value: 30}}, amount: 1500}
+      - {when: {feature: {name: guns_count, op: gte, value: 15}}, amount: 500}
+
+# ── Price caps (first matching rule wins) ────────────────────────────
+# cap_mode: base_plus_extra -> cap = base + extra_premium
+#           fixed           -> cap = base (extra NOT added)
+caps:
+  no_m4:
+    - id: ultra_rares_no_m4
+      when: {feature: {name: _extra_premium, op: gte, value: 2500}}
+      cap_mode: base_plus_extra
+      base: 3500
+      segment: "Capped: Ultra Rares (No M4)"
+      confidence_margin: 800
+    - id: rare_items_no_m4
+      when: {feature: {name: _extra_premium, op: gt, value: 0}}
+      cap_mode: base_plus_extra
+      base: 1500
+      segment: "Capped: Rare Items (No M4)"
+      confidence_margin: 600
+    - id: joker_mummy_only_no_m4
+      when: {any_of: [{feature: {name: _has_joker_fox, op: truthy}},
+                      {feature: {name: _has_mummy, op: truthy}}]}
+      cap_mode: fixed
+      base: 2000
+      segment: "Capped: Joker/Mummy Only (Dynamic)"
+      confidence_margin: 400
+    - id: xsuit_or_car_only_no_m4
+      when: {any_of: [{feature: {name: _has_xsuit, op: truthy}},
+                      {feature: {name: _has_mythic_car, op: truthy}}]}
+      cap_mode: base_plus_extra
+      base: 1500
+      segment: "Capped: X-Suit/Mythic Car Only (Dynamic)"
+      confidence_margin: 300
+    - id: girl_face_only_no_m4
+      when: {feature: {name: _has_girl_face, op: truthy}}
+      cap_mode: base_plus_extra
+      base: 1000
+      segment: "Capped: Girl Face Only (Dynamic)"
+      confidence_margin: 250
+    - id: no_anchors_no_m4
+      when: {always: true}
+      cap_mode: base_plus_extra
+      base: 500
+      segment: "Capped: No Anchors (Dynamic)"
+      confidence_margin: 200
+
+  with_m4:
+    - id: max_m4_anchors
+      when: {feature: {name: _m4_is_max_tier, op: truthy}}
+      cap_mode: base_plus_extra
+      base: 5000
+      segment: "Capped: Max M4 + Anchors (Dynamic)"
+      confidence_margin: 800
+    - id: kill_msg_m4_anchors
+      when: {feature: {name: m4_level_eff, op: eq, value: 4}}
+      cap_mode: base_plus_extra
+      base: 2500
+      segment: "Capped: Kill Msg M4 (Lvl 4) + Anchors (Dynamic)"
+      confidence_margin: 500
+    - id: high_lvl_m4_anchors
+      when: {feature: {name: m4_level_eff, op: gt, value: 4}}
+      cap_mode: base_plus_extra
+      base: 3500
+      segment: "Capped: High Lvl M4 + Anchors (Dynamic)"
+      confidence_margin: 600
+    - id: basic_m4_anchors
+      when: {always: true}
+      cap_mode: base_plus_extra
+      base: 1500
+      segment: "Capped: Basic M4 + Anchors (Dynamic)"
+      confidence_margin: 300
+
+# ── Multiple-M4 premium (applied AFTER caps, uncapped) ───────────────
+multi_m4:
+  trigger: {feature: {name: m4_count, op: gt, value: 1}}
+  segment_label: "Premium: Double M4"
+  triple_word_replace: {"Double": "Triple"}
+  per_extra_m4_ladder:  # first match wins, evaluated per extra M4 index
+    - {when: {any_of: [{feature: {name: _extra_m4_is_max, op: truthy}},
+                       {feature: {name: _extra_m4_level, op: gte, value: 7}}]}, amount: 2500, tag: "+Max"}
+    - {when: {feature: {name: _extra_m4_level, op: gte, value: 4}}, amount: 1500, tag: "+Kill Msg"}
+    - {when: {always: true}, amount: 800, tag: "+Basic"}
+
+# ── Confidence scoring ───────────────────────────────────────────────
+confidence:
+  base_score: 95
+  price_penalties:
+    - {when: {value_name: final_price, op: gte, value: 15000}, penalty: 25}
+    - {when: {value_name: final_price, op: gte, value: 8000}, penalty: 10}
+  rare_item_penalty_per_item: 4
+  rare_item_features: [has_mummy, has_xsuit]
+  car_penalty_cap: 2
+  clamp: [40, 99]
+  labels:
+    - {min_score: 85, label: "🟢 ثقة عالية (الموديل متأكد جداً من السعر)"}
+    - {min_score: 70, label: "🟡 ثقة متوسطة (السعر تقريبي، قد يختلف قليلاً)"}
+    - {min_score: 0,  label: "🔴 ثقة منخفضة (الحساب نادر/غالي والداتا قليلة، يحتاج تقييم بشري للإضافة)"}
+
+# ── Flipping / arbitrage margins ─────────────────────────────────────
+flipping:
+  tiers:
+    - {max_fair_value: 3000,  buy_discount: 0.30, sell_premium: 0.15}
+    - {max_fair_value: 15000, buy_discount: 0.20, sell_premium: 0.10}
+    - {max_fair_value: null,  buy_discount: 0.15, sell_premium: 0.10}
+  ratings:
+    instant_buy: "🔥🔥 لقطة ممتازة! (اشترِ فوراً)"
+    fair: "👍 سعر عادل (حاول تنزل السعر لضمان ربح)"
+    overpriced: "❌ غالي جداً (تجاوزه)"

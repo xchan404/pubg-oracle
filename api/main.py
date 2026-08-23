@@ -1,33 +1,27 @@
-# -*- coding: utf-8 -*-
 """
 PUBG Market Intelligence API
 FastAPI application for evaluating accounts and providing market stats.
 """
 
-import sys
-import os
 import io
+import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
+
 import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from parser.text_cleaner import clean_text
-from parser.regex_parser import parse_account_data
-from ml.predict import EnsemblePricer
-from ml.features import FeatureEngineer
 from ml.pipeline import pipeline_instance
-from parser.aliases import resolve_alias
-
+from ml.predict import EnsemblePricer
 
 app = FastAPI(
     title="PUBG Market Intelligence API",
@@ -61,12 +55,14 @@ except Exception as e:
     pricer = None
     print(f"Warning: Model not loaded: {e}")
 
-import pandas as pd
 import asyncio
+
+import pandas as pd
+
 
 class AccountRequest(BaseModel):
     text: str
-    asking_price: Optional[float] = None
+    asking_price: float | None = None
 
 CSV_DATASET_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'parsed', 'csv', 'all_parsed_accounts.csv')
 
@@ -75,21 +71,21 @@ def save_evaluated_account_to_dataset(features: dict):
     try:
         if not os.path.exists(CSV_DATASET_PATH):
             return
-        
+
         csv_columns = pd.read_csv(CSV_DATASET_PATH, nrows=0).columns.tolist()
         row_dict = {col: features.get(col, None) for col in csv_columns}
         row_dict["channel_username"] = "web_evaluator"
         row_dict["message_id"] = int(os.urandom(3).hex(), 16)
-        
+
         row_df = pd.DataFrame([row_dict])
         row_df.to_csv(CSV_DATASET_PATH, mode='a', header=False, index=False)
-        
+
         # Clear cache in trends engine to immediately update row count
         global _trends
         if _trends is not None:
             _trends._df = None
-            
-        print(f"[INFO] Successfully saved evaluated account to dataset CSV.")
+
+        print("[INFO] Successfully saved evaluated account to dataset CSV.")
     except Exception as e:
         print(f"[WARN] Could not save account to dataset: {e}")
 
@@ -129,18 +125,18 @@ def extract_anchor_highlights(features: dict) -> list:
 async def evaluate_account(request: AccountRequest):
     if not pricer:
         raise HTTPException(status_code=503, detail="Pricing model is not available.")
-        
+
     features = await asyncio.to_thread(pipeline_instance.process, request.text)
-    
+
     # Save evaluated account into CSV dataset to increment dataset size counter
     await asyncio.to_thread(save_evaluated_account_to_dataset, features)
-    
+
     asking_price = request.asking_price
     if asking_price is None and features.get("price_egp") and float(features["price_egp"]) > 0:
         asking_price = float(features["price_egp"])
-        
+
     prediction = await asyncio.to_thread(pricer.predict, features, asking_price)
-    
+
     # Extract security audit payload
     trust_score = features.get("trust_score", 70)
     risk_level = features.get("security_risk_level", "LOW")
@@ -155,10 +151,10 @@ async def evaluate_account(request: AccountRequest):
 
     fair_val = prediction["fair_value_egp"]
     price_range = prediction.get("price_range", f"{int(fair_val*0.85):,} - {int(fair_val*1.15):,} EGP")
-    
+
     deal_verdict = prediction.get("deal_verdict")
     deal_explanation = prediction.get("deal_explanation")
-    
+
     if not deal_verdict and asking_price and asking_price > 0:
         if fair_val >= asking_price * 1.15:
             deal_verdict = "GREAT_DEAL"
@@ -171,8 +167,8 @@ async def evaluate_account(request: AccountRequest):
             deal_explanation = f"سعر مبالغ فيه! التقييم ({fair_val:,.0f} ج.م) أقل من المطلوب ({asking_price:,.0f} ج.م)"
     elif not deal_verdict:
         deal_verdict = "FAIR_EVALUATION"
-        deal_explanation = f"تم التقييم بنجاح بناءً على عناصر الحساب واستراتيجيات التسعير"
-        
+        deal_explanation = "تم التقييم بنجاح بناءً على عناصر الحساب واستراتيجيات التسعير"
+
     inventory = {
         "account_level": features.get("account_level", "N/A"),
         "collection_level": features.get("collection_level", "N/A"),
@@ -260,6 +256,7 @@ def get_full_trends_report():
 # ─── MLOps Endpoints ────────────────────────
 from ml.retrain_service import get_mlops_telemetry, run_retrain_service
 
+
 @app.get("/mlops/status")
 def get_mlops_status():
     """Returns dataset size, drift status (PSI score), training history, and MLOps metrics."""
@@ -273,7 +270,7 @@ async def trigger_retrain():
         await asyncio.to_thread(run_retrain_service, force=True)
         return {"status": "success", "message": "Model retraining triggered and completed successfully."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}") from e
 
 
 if __name__ == "__main__":
