@@ -1,0 +1,10 @@
+{
+  "method": "split_conformal",
+  "coverage_target": 0.9,
+  "calibration_size": 6234,
+  "global_width": 7605,
+  "cheap_width": 5346,
+  "expensive_width": 28783,
+  "created_at": "2026-08-23T12:06:48.303219+00:00",
+  "empirical_coverage_calib": 0.8999
+}

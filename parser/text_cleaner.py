@@ -23,7 +23,17 @@ ARABIC_NUMERALS = {
     '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
 }
 
+# Tashkeel (diacritics) + tatweel: invisible to humans, poison for matching
+_DIACRITICS_RE = re.compile(r'[\u064B-\u0652\u0670\u0640]')
+
+
+def strip_diacritics(text: str) -> str:
+    """Removes tashkeel/fathatan/dammatan/kasratan/shadda/sukun and tatweel."""
+    return _DIACRITICS_RE.sub('', text)
+
+
 def normalize_arabic(text: str) -> str:
+    text = strip_diacritics(text)
     for char, replacement in ARABIC_NORMALIZE.items():
         text = text.replace(char, replacement)
     return text

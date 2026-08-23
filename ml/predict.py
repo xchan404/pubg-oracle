@@ -11,6 +11,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import json
 import warnings
 
 import joblib
@@ -21,6 +22,8 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 from ml.pipeline import pipeline_instance
 from ml.rules_engine import PricingRulesEngine, build_context
+
+SEGMENT_THRESHOLD = 15000
 
 
 class EnsemblePricer:
@@ -37,6 +40,16 @@ class EnsemblePricer:
         q90_path = os.path.join(models_dir, 'pubg_pricer_q90.pkl')
         self.q10_model = joblib.load(q10_path) if os.path.exists(q10_path) else None
         self.q90_model = joblib.load(q90_path) if os.path.exists(q90_path) else None
+
+        # Split-conformal calibration (Phase 1): statistically-backed widths
+        conformal_path = os.path.join(models_dir, 'conformal.json')
+        self.conformal = None
+        if os.path.exists(conformal_path):
+            try:
+                with open(conformal_path, encoding='utf-8') as fh:
+                    self.conformal = json.load(fh)
+            except Exception:
+                self.conformal = None
 
         # Declarative business rules (premiums / caps / confidence / flipping)
         self.rules_engine = PricingRulesEngine()
@@ -128,17 +141,36 @@ class EnsemblePricer:
         # ── Confidence score ─────────────────────────────────────
         confidence = self.rules_engine.compute_confidence(ctx, final_price)
 
-        # ── Empirical price bounds ───────────────────────────────
-        if q10_price and q90_price:
+        # ── Price bounds: conformal → quantile models → legacy margin ──
+        interval_method = "legacy_margin"
+        if self.conformal:
+            cw = self.conformal.get('cheap_width')
+            ew = self.conformal.get('expensive_width')
+            gw = self.conformal.get('global_width')
+            # Segment by blended estimate (same rule as training calibration)
+            width = (cw if float(final_price) < SEGMENT_THRESHOLD else ew) or gw
+            if width:
+                lower_bound = max(0, int(fair_value - width))
+                upper_bound = int(fair_value + width)
+                interval_method = f"split_conformal_{self.conformal.get('coverage_target', 0.9)}"
+        elif q10_price and q90_price:
             lower_bound = max(0, int(round(q10_price)))
             upper_bound = max(lower_bound + 100, int(round(q90_price)))
-            price_range_str = f"{lower_bound} - {upper_bound} EGP"
+            interval_method = "quantile_models"
         else:
-            price_range_str = f"{max(0, fair_value - confidence_margin)} - {fair_value + confidence_margin} EGP"
+            lower_bound = max(0, fair_value - confidence_margin)
+            upper_bound = fair_value + confidence_margin
+
+        price_range_str = f"{lower_bound} - {upper_bound} EGP"
 
         result = {
             "fair_value_egp": fair_value,
             "price_range": price_range_str,
+            "price_interval": {
+                "lower": lower_bound,
+                "upper": upper_bound,
+                "method": interval_method,
+            },
             "segment": segment,
             "confidence": confidence,
             "models_breakdown": {

@@ -7,6 +7,7 @@ extracting engineered features, and preparing vectors for model training and inf
 from typing import Any
 
 from ml.features import FeatureEngineer
+from ml.fingerprint import compute_fingerprint
 from parser.aliases import resolve_text_items
 from parser.extractors.security import SecurityExtractor
 from parser.regex_parser import parse_account_data
@@ -72,6 +73,9 @@ class FeaturePipeline:
         result["extracted_items_str"] = ",".join(canonical_items)
         result["active_combos_str"] = ",".join(intel["active_combos"])
         result.update(intel)
+
+        # Stable identity hash for dedup / group-aware splitting (Phase 1+)
+        result["account_fingerprint"] = compute_fingerprint(result)
 
         # Validate through Pydantic schema
         schema = ParsedAccountSchema(**result)
