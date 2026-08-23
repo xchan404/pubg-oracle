@@ -13,6 +13,9 @@ if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 
+
+from typing import Optional  # noqa: F401 - used in route signatures below
+
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -208,7 +211,11 @@ async def evaluate_account(request: AccountRequest):
 
 
 # ─── Market Trends & Analytics Endpoints ─────────────────────
+from intelligence.item_index import build_item_index, get_item_card
+from intelligence.market_data import load_market_dataframe
+from intelligence.repost_engine import get_listing_timeline, get_repost_summary
 from intelligence.trends import MarketTrendsEngine
+from intelligence.trust import compute_channel_trust
 
 _trends = None
 def _get_trends():
@@ -216,6 +223,15 @@ def _get_trends():
     if _trends is None:
         _trends = MarketTrendsEngine()
     return _trends
+
+# ── Intelligence engines (Phase 2) — lazily built over the enriched dataset
+_intel_cache: dict = {}
+
+def _get_intel(name: str, builder):
+    """Lazily computes and caches an intelligence artifact."""
+    if name not in _intel_cache:
+        _intel_cache[name] = builder(load_market_dataframe())
+    return _intel_cache[name]
 
 @app.get("/market/summary")
 def get_market_summary():
@@ -251,6 +267,54 @@ def get_rarity_demand_heatmap():
 def get_full_trends_report():
     """Returns the complete market trends report with all analytics."""
     return _get_trends().get_full_report()
+
+
+# ─── Intelligence Endpoints (Phase 2: dedup, item index, trust) ──────
+
+@app.get("/market/reposts")
+def get_repost_analytics():
+    """Repost clusters, price trajectories, days-on-market and sold markers."""
+    return _get_intel("reposts", get_repost_summary)
+
+
+@app.get("/market/reposts/{fingerprint}")
+def get_single_listing_timeline(fingerprint: str):
+    """Full repost timeline for one account fingerprint."""
+    return get_listing_timeline(load_market_dataframe(), fingerprint)
+
+
+@app.get("/market/item-index")
+def get_item_price_index(item: str | None = None):
+    """
+    Monthly hedonic price index per canonical item (EGP uplift vs comparable
+    listings). Pass ?item=glacier_m416 for a single card.
+    """
+    index = _get_intel("item_index", build_item_index)
+    if item:
+        card = get_item_card(index, item)
+        if card is None:
+            raise HTTPException(status_code=404, detail=f"Item not indexed: {item}")
+        return card
+    return {"items": index, "count": len(index)}
+
+
+@app.get("/market/item-index/{item_id}")
+def get_single_item_index(item_id: str):
+    """Single-item hedonic price index card."""
+    index = _get_intel("item_index", build_item_index)
+    card = get_item_card(index, item_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail=f"Item not indexed: {item_id}")
+    return card
+
+
+@app.get("/market/channels/trust")
+def get_channel_trust_ranking():
+    """Trust scores per channel: scam signals, spam ratio, repost flooding."""
+    def builder(df):
+        result = compute_channel_trust(df)
+        return result
+    return _get_intel("trust", builder)
 
 
 # ─── MLOps Endpoints ────────────────────────
