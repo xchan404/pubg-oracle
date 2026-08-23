@@ -6,7 +6,7 @@ import sys
 
 from aiohttp import web
 from dotenv import load_dotenv
-from telethon import TelegramClient, events
+from telethon import Button, TelegramClient, events
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -15,8 +15,12 @@ if hasattr(sys.stdout, 'buffer'):
 
 from database.ads import initialize as init_ads_db
 from database.ads import save_ad
+from database.feedback import save_feedback
+from ml.active_learning import select_review_queue
 from ml.predict import EnsemblePricer
 from parser.regex_parser import parse_account_data
+
+_ = (save_feedback, select_review_queue)  # used in handlers defined below
 
 load_dotenv()
 
@@ -55,6 +59,28 @@ client = TelegramClient('pubg_scraper_session', int(API_ID), API_HASH)
 
 # بوت التنبيهات (البوت الخاص بك) - عشان يبعتلك التنبيهات ويرد عليك
 bot_client = TelegramClient('bot_sniper_session', int(API_ID), API_HASH)
+# ── Phase 3: حالة انتظار "السعر النهائي" بعد الضغط على زر اتباعع بسعر ──
+PENDING_PRICE = {}
+
+
+def feedback_buttons(chat_id: int, message_id: int, fingerprint: str = ""):
+    """Inline keyboard binding a label to the ORIGINAL ad coordinates."""
+    payload = f"{chat_id}|{message_id}|{fingerprint or ''}"
+    return [[
+        Button.inline("✅ اشتريته", f"buy|{payload}".encode()),
+        Button.inline("💰 اتباع بسعر", f"price|{payload}".encode()),
+    ], [
+        Button.inline("❌ مش صفقة", f"nope|{payload}".encode()),
+        Button.inline("🐛 استخراج غلط", f"wrong|{payload}".encode()),
+    ]]
+
+
+LABEL_MAP = {
+    "buy": "bought",
+    "price": "sold_price",
+    "nope": "not_a_deal",
+    "wrong": "wrong_parse",
+}
 
 
 def escape_html(text):
@@ -234,9 +260,36 @@ async def bot_handler(event):
         await event.reply(
             "👋 <b>أهلاً! أنا بوت تسعير أكونتات PUBG</b>\n\n"
             "ابعتلي إعلان الأكونت وأنا هسعرهولك فوراً بالذكاء الاصطناعي! 🤖\n\n"
+            "الأوامر:\n"
+            "• /review — أقل إعلانات الثقة للمراجعة والتعليم ✍️\n\n"
             "مثال:\n<pre>امفور نمر كيل\nاسكار كيل\nالسعر 2000</pre>",
             parse_mode='html'
         )
+        return
+
+    if text.strip() == '/review':
+        await event.reply("⏳ جاري تجهيز قائمة المراجعة...")
+        try:
+            items = select_review_queue(limit=5)
+        except Exception as e:
+            await event.reply(f"⚠️ خطأ في قائمة المراجعة: {escape_html(str(e))}", parse_mode='html')
+            return
+        if not items:
+            await event.reply("👌 مفيش إعلانات حديثة محتاجة مراجعة.")
+            return
+        lines = ["🔍 <b>أقل الإعلانات ثقة — علّم عليها من تنبيهات الصيد:</b>\n"]
+        for i, it in enumerate(items, 1):
+            asked = it['asked_price'] if it['asked_price'] is not None else '؟'
+            lines.append(
+                f"<b>{i}.</b> ثقة <b>{it['confidence_pct']}%</b> | "
+                f"مطلوب: {asked} | عادل: {it['fair_value']}\n"
+                f"<pre>{escape_html(it['excerpt'])}</pre>"
+            )
+        await event.reply("\n".join(lines), parse_mode='html')
+        return
+
+    # Phase 3: هل المستخدم بيرد بسعر البيع الفعلي بعد زر اتباع بسعر؟
+    if await handle_pending_price(event, text):
         return
 
     print(f"[Bot] رسالة واردة للتسعير: {text[:40]}...")
@@ -322,13 +375,101 @@ async def sniper_handler(event):
             report = format_deal_message(res, text, chat_title, msg_link, parsed=parsed)
             print(f"🚀 [صيدة!] المطلوب: {asking_price} | العادل: {fair_value:.0f} | المكسب: {profit:.0f} ج.م")
 
-            await bot_client.send_message(MY_CHAT_ID, report, parse_mode='html')
+            await bot_client.send_message(
+                MY_CHAT_ID,
+                report,
+                parse_mode='html',
+                buttons=feedback_buttons(event.chat_id, event.id,
+                                         str(parsed.get('account_fingerprint', ''))),
+            )
             print("✅ تم إرسال التنبيه عبر البوت بنجاح!")
         else:
             print(f"⚠️ [مكسب ضعيف] {profit} ج.م أقل من الحد ({MIN_PROFIT} ج.م) أو السعر غير مغري.")
 
     except Exception as e:
         print(f"⚠️ خطأ في معالجة رسالة السنايبر: {e}")
+
+
+# ============================================================
+# Phase 3 — Feedback Flywheel Handlers
+# ============================================================
+@bot_client.on(events.CallbackQuery(pattern=rb'^(buy|price|nope|wrong)\|'))
+async def feedback_callback(event):
+    """Records the human label tapped on an alert's inline buttons."""
+    try:
+        label_key, payload = event.data.decode().split('|', 1)
+        orig_chat_s, orig_msg_s, fingerprint = (payload.split('|') + [''])[:3]
+        orig_chat_id, orig_message_id = int(orig_chat_s), int(orig_msg_s)
+        label = LABEL_MAP.get(label_key)
+
+        if not label:
+            await event.answer('تصنيف غير معروف', alert=True)
+            return
+
+        if label == 'sold_price':
+            PENDING_PRICE[event.sender_id] = {
+                'chat_id': orig_chat_id,
+                'message_id': orig_message_id,
+                'fingerprint': fingerprint or None,
+                'label': 'sold_price',
+            }
+            await event.answer(
+                '💰 اكتب السعر النهائي اللي اتباع بيه (الرقم بس)',
+                alert=True,
+            )
+            return
+
+        saved = save_feedback(
+            chat_id=orig_chat_id,
+            message_id=orig_message_id,
+            label=label,
+            fingerprint=fingerprint or None,
+        )
+        await event.answer(
+            '✅ تم تسجيل التقييم' if saved else '⚠️ متسجل قبل كده',
+            alert=True,
+        )
+        if saved:
+            print(f"[Feedback] {label} على إعلان {orig_message_id} من {orig_chat_id}")
+    except Exception as e:
+        print(f"⚠️ [feedback_callback] {e}")
+        try:
+            await event.answer(f'خطأ: {e}', alert=True)
+        except Exception:
+            pass
+
+
+async def handle_pending_price(event, text):
+    """Consumes the actual-sale-price reply when one is pending. Returns True if handled."""
+    pending = PENDING_PRICE.pop(event.sender_id, None)
+    if not pending:
+        return False
+
+    num_match = re.search(r'\d[\d,\.]*', text.replace('ج', '').replace('م', ''))
+    if not num_match:
+        await event.reply("❌ مش فهم السعر. ابعت الرقم بس (مثال: 4500)", parse_mode='html')
+        return True
+
+    try:
+        price = float(num_match.group().replace(',', ''))
+    except ValueError:
+        await event.reply("❌ صيغة السعر غلط. حاول تاني.")
+        return True
+
+    saved = save_feedback(
+        chat_id=pending['chat_id'],
+        message_id=pending['message_id'],
+        label='sold_price',
+        value_egp=price,
+        fingerprint=pending.get('fingerprint'),
+    )
+    await event.reply(
+        f"✅ تم تسجيل سعر البيع الفعلي: <b>{price:,.0f} ج.م</b>\n"
+        + ("هتتستخدم في تدريب الموديل تلقائياً 🎯" if saved else "(متسجل قبل كده)")
+        , parse_mode='html'
+    )
+    print(f"[Feedback] sold_price={price:.0f} على إعلان {pending['message_id']}")
+    return True
 
 
 

@@ -83,3 +83,25 @@ class SnipedAd(Base):
     __table_args__ = (
         UniqueConstraint("chat_id", "message_id", name="uq_ads_chat_message"),
     )
+
+
+class DealFeedback(Base):
+    """
+    Human label on a sniped ad (Phase 3 feedback flywheel).
+    One row per (ad, label type). Verified sale prices feed retraining.
+    """
+    __tablename__ = "deal_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chat_id = Column(Integer, nullable=False, index=True)
+    message_id = Column(Integer, nullable=False, index=True)
+    # bought | sold_price | not_a_deal | wrong_parse | scam
+    label = Column(String(32), nullable=False)
+    value_egp = Column(Float, nullable=True)      # actual sale price when known
+    corrected_data = Column(Text, nullable=True)  # JSON corrections for wrong_parse
+    fingerprint = Column(String(64), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("chat_id", "message_id", "label", name="uq_feedback_ad_label"),
+    )

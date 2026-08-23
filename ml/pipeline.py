@@ -9,7 +9,9 @@ from typing import Any
 from ml.features import FeatureEngineer
 from ml.fingerprint import compute_fingerprint
 from parser.aliases import resolve_text_items
+from parser.confidence import estimate_parse_confidence
 from parser.extractors.security import SecurityExtractor
+from parser.llm_fallback import maybe_llm_augment
 from parser.regex_parser import parse_account_data
 from parser.text_cleaner import clean_text
 from schemas.account import ParsedAccountSchema
@@ -76,6 +78,10 @@ class FeaturePipeline:
 
         # Stable identity hash for dedup / group-aware splitting (Phase 1+)
         result["account_fingerprint"] = compute_fingerprint(result)
+
+        # Parse confidence + optional LLM fallback for low-confidence ads (Phase 3)
+        confidence = estimate_parse_confidence(result)
+        result = maybe_llm_augment(result, raw_text or "", confidence)
 
         # Validate through Pydantic schema
         schema = ParsedAccountSchema(**result)

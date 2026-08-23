@@ -38,6 +38,8 @@ from ml.fingerprint import compute_fingerprint
 from ml.tracking import finish_run, log_metrics, start_run
 
 CSV_PATH = os.path.join("data", "parsed", "csv", "all_parsed_accounts.csv")
+# Phase 3: prefer the flywheel dataset (asking + verified sale labels) if built
+VERIFIED_DATASET_PATH = os.path.join("data", "parsed", "csv", "training_dataset.csv")
 MODELS_DIR = "models"
 SEGMENT_THRESHOLD = 15000  # EGP boundary between "cheap" and "expensive" segments
 RANDOM_STATE = 42
@@ -62,9 +64,14 @@ def monotone_vector(columns) -> list:
     return vec
 
 
-def load_dataset(csv_path: str = CSV_PATH) -> pd.DataFrame:
-    print("[INFO] Loading data from CSV...")
-    df = pd.read_csv(csv_path, low_memory=False)
+def load_dataset(csv_path: str | None = None) -> pd.DataFrame:
+    """Loads the training dataset, preferring the verified-labels version."""
+    path = csv_path or (
+        VERIFIED_DATASET_PATH if os.path.exists(VERIFIED_DATASET_PATH) else CSV_PATH
+    )
+    source = "flywheel (asking+verified)" if path == VERIFIED_DATASET_PATH else "asking-only"
+    print(f"[INFO] Loading data from {path} [{source}]...")
+    df = pd.read_csv(path, low_memory=False)
     df = df.dropna(subset=["price_egp", "clean_text"])
 
     # Filter negotiation words that skew asking prices
@@ -72,11 +79,20 @@ def load_dataset(csv_path: str = CSV_PATH) -> pd.DataFrame:
         r"راسلني|تفاوض|أو أقل|او اقل|أو أكتر|او اكتر|قابل للتفاوض|"
         r"او يزيد|أو يزيد|تقريبا|تقريباً|حوالي|يبدأ من|ابتداء من"
     )
-    df = df[~df["clean_text"].str.contains(bad_words, case=False, na=False)].copy()
+    is_asking = df.get("label_source", pd.Series("asking", index=df.index)).eq("asking")
+    negotiable = df["clean_text"].str.contains(bad_words, case=False, na=False)
+    # Verified sale prices are real outcomes — never drop them for wording
+    df = df[~(negotiable & is_asking)].copy()
 
     df = df[(df["price_egp"] >= 1000) & (df["price_egp"] <= 80000)].copy()
+    if "sample_weight" not in df.columns:
+        df["sample_weight"] = 1.0
     df.reset_index(drop=True, inplace=True)
-    print(f"[INFO] Total priced accounts for training: {len(df)}")
+
+    n_verified = int((df["label_source"] == "verified").sum()) \
+        if "label_source" in df.columns else 0
+    print(f"[INFO] Total priced accounts for training: {len(df)} "
+          f"(verified-sale rows: {n_verified})")
     return df
 
 
@@ -199,20 +215,21 @@ def tune_lightgbm(X: pd.DataFrame, y_log: pd.Series, groups: pd.Series,
     return best
 
 
-def _fit_tolerant(builder, X_fit, y_fit, label: str):
+def _fit_tolerant(builder, X_fit, y_fit, w_fit, label: str):
     """
     Fits a model with monotone constraints when the library/objective
     supports it (LightGBM rejects them under L1/MAE), otherwise retries
     unconstrained with a warning instead of crashing the pipeline.
+    Sample weights carry the Phase 3 verified-label upweighting.
     """
     try:
         model = builder(constrained=True)
-        model.fit(X_fit, y_fit)
+        model.fit(X_fit, y_fit, sample_weight=w_fit)
         return model
     except Exception as exc:  # noqa: BLE001 - any library rejection falls back
         print(f"[WARN] Monotone constraints unavailable for {label} ({exc}); fitting unconstrained.")
         model = builder(constrained=False)
-        model.fit(X_fit, y_fit)
+        model.fit(X_fit, y_fit, sample_weight=w_fit)
         return model
 
 
@@ -223,6 +240,8 @@ def fit_models(df: pd.DataFrame, X: pd.DataFrame, masks: dict, params_lgb: dict)
     that is subtle leakage; v2 fits with fixed budgets instead.
     """
     y_log_full = np.log1p(df.loc[masks["all"], "price_egp"])
+    weights_full = pd.to_numeric(df.loc[masks["all"], "sample_weight"],
+                                 errors="coerce").fillna(1.0)
     mono_vec = monotone_vector(X.columns)
 
     def build_lgb(constrained: bool):
@@ -249,10 +268,13 @@ def fit_models(df: pd.DataFrame, X: pd.DataFrame, masks: dict, params_lgb: dict)
         return CatBoostRegressor(**kw)
 
     lgb_model = _fit_tolerant(build_lgb, X.loc[masks["cheap"]],
-                              y_log_full.loc[masks["cheap"]], "lightgbm(cheap)")
+                              y_log_full.loc[masks["cheap"]],
+                              weights_full.loc[masks["cheap"]], "lightgbm(cheap)")
     xgb_model = _fit_tolerant(build_xgb, X.loc[masks["expensive"]],
-                              y_log_full.loc[masks["expensive"]], "xgboost(expensive)")
-    cat_model = _fit_tolerant(build_cat, X.loc[masks["all"]], y_log_full, "catboost(all)")
+                              y_log_full.loc[masks["expensive"]],
+                              weights_full.loc[masks["expensive"]], "xgboost(expensive)")
+    cat_model = _fit_tolerant(build_cat, X.loc[masks["all"]], y_log_full,
+                              weights_full, "catboost(all)")
 
     return lgb_model, xgb_model, cat_model
 
@@ -296,13 +318,16 @@ def conformal_widths(df_fit: pd.DataFrame, X_fit: pd.DataFrame,
 
 def main():
     n_trials = int(os.environ.get("OPTUNA_TRIALS", "12"))
+    df = add_fingerprints(load_dataset())
+    n_verified = int((df["label_source"] == "verified").sum()) \
+        if "label_source" in df.columns else 0
     run_id = start_run(
-        "train_v2_group_split",
-        params={"optuna_trials": n_trials, "segment_threshold": SEGMENT_THRESHOLD},
+        "train_v3_flywheel" if n_verified else "train_v2_group_split",
+        params={"optuna_trials": n_trials, "segment_threshold": SEGMENT_THRESHOLD,
+                "verified_rows": n_verified},
         dataset_path=CSV_PATH,
     )
 
-    df = add_fingerprints(load_dataset())
     df, X_base, base_features = build_feature_frame(df)
 
     # ── GROUP-AWARE TRAIN/TEST SPLIT (kills repost leakage) ──────────

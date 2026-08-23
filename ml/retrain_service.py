@@ -160,8 +160,19 @@ def get_mlops_telemetry() -> dict:
         "psi_score": psi_score,
         "drift_status": drift_status,
         "history_events_count": len(history),
-        "recent_history": history[-5:] if history else []
+        "recent_history": history[-5:] if history else [],
+        "verified_labels": _feedback_stats(),
     }
+
+
+def _feedback_stats() -> dict:
+    """Human-label counts from the Phase 3 feedback flywheel."""
+    try:
+        from database.feedback import get_label_stats
+        return get_label_stats()
+    except Exception as e:
+        print(f"[WARN] Feedback stats unavailable: {e}")
+        return {"labels_total": 0, "verified_sales": 0}
 
 
 def evaluate_mae(csv_path: str, models_dir: str, sample_size: int = 1000) -> float:
