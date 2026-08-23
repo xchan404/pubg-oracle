@@ -24,7 +24,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 # UTF-8 Output wrapping for Windows console
-if hasattr(sys.stdout, 'buffer'):
+if hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 CSV_PATH = os.path.join(PROJECT_ROOT, 'data', 'parsed', 'csv', 'all_parsed_accounts.csv')

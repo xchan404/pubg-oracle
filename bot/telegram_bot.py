@@ -10,7 +10,7 @@ from telethon import Button, TelegramClient, events
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-if hasattr(sys.stdout, 'buffer'):
+if hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 from database.ads import initialize as init_ads_db
@@ -383,11 +383,62 @@ async def sniper_handler(event):
                                          str(parsed.get('account_fingerprint', ''))),
             )
             print("✅ تم إرسال التنبيه عبر البوت بنجاح!")
+            push_deal_to_dashboard(res, chat_title, msg_link, asking_price)
         else:
             print(f"⚠️ [مكسب ضعيف] {profit} ج.م أقل من الحد ({MIN_PROFIT} ج.م) أو السعر غير مغري.")
 
     except Exception as e:
         print(f"⚠️ خطأ في معالجة رسالة السنايبر: {e}")
+
+
+# ============================================================
+# Phase 4 — Live Dashboard Feed (fire-and-forget push to API)
+# ============================================================
+def push_deal_to_dashboard(res, chat_title, msg_link, asking_price):
+    """POSTs the deal to the API hub for WebSocket dashboards. Never raises."""
+    import json as _json
+
+    async def _post():
+        import aiohttp
+        base = os.getenv('API_URL', 'http://127.0.0.1:8000').rstrip('/')
+        headers = {}
+        token = os.getenv('INTERNAL_TOKEN')
+        if token:
+            headers['X-Internal-Token'] = token
+        adv = res.get('flipping_advice') or {}
+        payload = {
+            'chat_title': chat_title,
+            'message_link': msg_link,
+            'asked_price': asking_price,
+            'fair_value': res.get('fair_value_egp', 0),
+            'profit': adv.get('profit_if_bought_at_asking'),
+            'segment': res.get('segment', ''),
+            'confidence_label': res.get('confidence', {}).get('label', ''),
+            'deal_rating': adv.get('deal_rating', ''),
+        }
+        timeout = aiohttp.ClientTimeout(total=5)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            await session.post(f'{base}/internal/deal', json=payload, headers=headers)
+
+    def _run():
+        try:
+            asyncio.ensure_future(_post())
+        except RuntimeError:
+            # No running loop in this thread context; run synchronously-ish
+            try:
+                asyncio.run(_post())
+            except Exception:
+                pass
+
+    try:
+        _ = _json  # keep json import local-purpose clear
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(_post())
+        else:
+            _run()
+    except Exception as e:
+        print(f"[dashboard-push] skipped: {e}")
 
 
 # ============================================================

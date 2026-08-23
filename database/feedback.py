@@ -92,6 +92,54 @@ def get_label_stats() -> dict[str, Any]:
         session.close()
 
 
+def get_positions() -> list[dict[str, Any]]:
+    """
+    Portfolio view: every 'bought' label becomes a position (cost = asking
+    price); a matching 'sold_price' label closes it with actual revenue.
+    """
+    session = SessionLocal()
+    try:
+        bought = (
+            session.query(SnipedAd, DealFeedback)
+            .join(
+                DealFeedback,
+                (DealFeedback.chat_id == SnipedAd.chat_id)
+                & (DealFeedback.message_id == SnipedAd.message_id),
+            )
+            .filter(DealFeedback.label == "bought")
+            .order_by(DealFeedback.created_at.desc())
+            .all()
+        )
+        sold_map: dict[tuple, float] = {}
+        sold_rows = (
+            session.query(DealFeedback)
+            .filter(
+                DealFeedback.label == "sold_price",
+                DealFeedback.value_egp.isnot(None),
+            )
+            .all()
+        )
+        for fb in sold_rows:
+            sold_map[(fb.chat_id, fb.message_id)] = float(fb.value_egp)
+
+        positions = []
+        for ad, _fb in bought:
+            positions.append({
+                "chat_id": ad.chat_id,
+                "message_id": ad.message_id,
+                "asked_price": ad.asked_price,
+                "sold_price": sold_map.get((ad.chat_id, ad.message_id)),
+                "segment": ad.segment,
+                "timestamp": ad.timestamp,
+            })
+        return positions
+    except Exception as e:
+        logger.error(f"Error loading portfolio positions: {e}")
+        return []
+    finally:
+        session.close()
+
+
 def get_verified_sales(limit: int | None = None) -> list[dict[str, Any]]:
     """
     Verified ground-truth sales: ads labeled bought/sold_price with an

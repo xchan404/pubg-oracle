@@ -26,10 +26,24 @@ services:
       - MY_CHAT_ID=${MY_CHAT_ID}
       - MIN_PROFIT_THRESHOLD=${MIN_PROFIT_THRESHOLD:-300}
       - TARGET_CHATS=${TARGET_CHATS:-}
+      - API_URL=http://api:8000
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
     volumes:
       - models-data:/app/models
       - app-data:/app/data
       - bot-sessions:/app/sessions
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  scheduler:
+    build: .
+    command: python ops/scheduler.py
+    environment:
+      - SCHEDULER_INTERVAL_MINUTES=${SCHEDULER_INTERVAL_MINUTES:-360}
+    volumes:
+      - models-data:/app/models
+      - app-data:/app/data
     restart: unless-stopped
     depends_on:
       - api

@@ -9,7 +9,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-if hasattr(sys.stdout, 'buffer'):
+if hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 
@@ -17,12 +17,13 @@ if hasattr(sys.stdout, 'buffer'):
 from typing import Optional  # noqa: F401 - used in route signatures below
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from api.deals_hub import hub
 from ml.pipeline import pipeline_instance
 from ml.predict import EnsemblePricer
 
@@ -52,6 +53,7 @@ def root():
 
 
 # Load the model
+pricer: EnsemblePricer | None = None
 try:
     pricer = EnsemblePricer(models_dir='models')
 except Exception as e:
@@ -111,9 +113,9 @@ def extract_anchor_highlights(features: dict) -> list:
         anchors.append({"name": "👑 X-Suit Outfit (بدلة اكس)", "tier": "S", "icon": "👑"})
     if features.get("has_face_girl"):
         anchors.append({"name": "👩 Girl Face & Hair (وش البنت الأصلي)", "tier": "A+", "icon": "👩"})
-    if features.get("has_car_mclaren") or features.get("has_car_porsche") or features.get("has_car_dodge") or (features.get("cars_mythic") and features.get("cars_mythic") > 0):
+    if features.get("has_car_mclaren") or features.get("has_car_porsche") or features.get("has_car_dodge") or (features.get("cars_mythic") or 0) > 0:
         anchors.append({"name": "🏎️ Mythic Supercar (سيارة ميثك)", "tier": "A+", "icon": "🏎️"})
-    if features.get("has_conqueror") or (features.get("conqueror_frames_count") and features.get("conqueror_frames_count") > 0):
+    if features.get("has_conqueror") or (features.get("conqueror_frames_count") or 0) > 0:
         anchors.append({"name": "🏆 Conqueror Frame/Title (إطار كونكر)", "tier": "A", "icon": "🏆"})
     if features.get("has_lobby_mythic"):
         anchors.append({"name": "🏛️ Mythic Lobby (لوبي ميثك)", "tier": "A", "icon": "🏛️"})
@@ -339,3 +341,109 @@ async def trigger_retrain():
 
 if __name__ == "__main__":
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+# ─── Health ──────────────────────────────────────────────────
+@app.get("/health")
+def health_check():
+    """Lightweight liveness probe for Docker/monitoring."""
+    return {"status": "ok", "model_loaded": pricer is not None}
+
+
+# ─── Live Deals Feed (Phase 4) ───────────────────────────────
+class DealPush(BaseModel):
+    chat_title: str = ""
+    message_link: str = ""
+    asked_price: float | None = None
+    fair_value: float
+    profit: float | None = None
+    segment: str = ""
+    confidence_label: str = ""
+    deal_rating: str = ""
+    fingerprint: str = ""
+
+
+@app.post("/internal/deal")
+async def push_deal(deal: DealPush, x_internal_token: str | None = Header(default=None)):
+    """Sniper bot pushes detected deals here; hub broadcasts to dashboards."""
+    if hub.token_required() and not hub.token_valid(x_internal_token):
+        raise HTTPException(status_code=401, detail="Invalid internal token")
+    return hub.publish(deal.model_dump())
+
+
+@app.get("/deals/recent")
+def recent_deals(limit: int = 20):
+    """Replay buffer of the latest pushed deals."""
+    return {"deals": list(hub.recent)[: max(1, min(50, limit))]}
+
+
+@app.websocket("/ws/deals")
+async def ws_deals(ws: WebSocket):
+    await hub.connect(ws)
+    try:
+        for deal in list(hub.recent)[:10]:
+            await ws.send_json(deal)
+        while True:
+            # keepalive: consume pings/messages; broadcasts arrive async
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        await hub.disconnect(ws)
+
+
+# ─── Portfolio Tracker (Phase 4) ─────────────────────────────
+@app.get("/portfolio/summary")
+def portfolio_summary():
+    """Flipping P&L derived from bought/sold feedback labels."""
+    from database.feedback import get_positions
+    from intelligence.portfolio import build_portfolio_summary
+
+    return build_portfolio_summary(get_positions())
+
+
+# ─── Pricing Rules Admin (Phase 5 hot-reload) ────────────────
+from ml.rules_engine import DEFAULT_RULES_PATH, validate_rules_text  # noqa: E402
+
+
+def _write_rules(path, text):  # isolated for testability
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+@app.get("/rules")
+def get_rules():
+    """Current pricing rules (parsed) + the raw YAML text."""
+    path = str(DEFAULT_RULES_PATH)
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    rules, errors = validate_rules_text(text)
+    return {"path": path, "rules": rules or {}, "validation_errors": errors}
+
+
+@app.put("/rules")
+async def put_rules(payload: dict):
+    """
+    Hot-reload pricing rules. Body: {"yaml_text": "..."}.
+    Validates before writing; updates the live API pricer in place.
+    (Bot process picks up changes on its next restart.)
+    """
+    yaml_text = (payload or {}).get("yaml_text", "")
+    if not yaml_text.strip():
+        raise HTTPException(status_code=400, detail="yaml_text is required")
+
+    rules, errors = validate_rules_text(yaml_text)
+    if errors:
+        raise HTTPException(status_code=422, detail={"errors": errors})
+
+    _write_rules(DEFAULT_RULES_PATH, yaml_text)
+
+    # Hot-swap into every live engine instance in this process
+    if pricer is not None and hasattr(pricer, "rules_engine"):
+        pricer.rules_engine.rules = rules
+        pricer.rules_engine.version = rules.get("version", 1)
+    _intel_cache.pop("item_index", None)
+
+    return {"status": "reloaded", "version": rules.get("version", 1)}

@@ -65,6 +65,14 @@
                     <i class="fa-solid fa-chart-pie"></i>
                     <span>مؤشرات السوق</span>
                 </button>
+                <button class="tab-btn" data-tab="itemIndexTab">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>بورصة العناصر</span>
+                </button>
+                <button class="tab-btn" data-tab="dealsTab">
+                    <i class="fa-solid fa-crosshairs"></i>
+                    <span>الصيد الحي والثقة</span>
+                </button>
                 <button class="tab-btn" data-tab="heatmapTab">
                     <i class="fa-solid fa-fire"></i>
                     <span>مصفوفة الندرة والطلب</span>
@@ -260,6 +268,89 @@
                             <!-- Injected via JS -->
                         </div>
                     </div>
+                </div>
+            </section>
+
+
+            <!-- ========================================== -->
+            <!-- TAB 5: ITEM PRICE EXCHANGE (Phase 2/4)     -->
+            <!-- ========================================== -->
+            <section id="itemIndexTab" class="tab-content">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>
+                            <i class="fa-solid fa-chart-line color-cyan"></i>
+                            بورصة العناصر — القيمة الشهرية لكل عنصر نادر (Hedonic Item Index)
+                        </h2>
+                        <button id="refreshItemIndexBtn" class="icon-action-btn">
+                            <i class="fa-solid fa-arrows-rotate"></i> تحديث
+                        </button>
+                    </div>
+
+                    <p class="section-desc">
+                        القيمة الإضافية التقديرية (EGP) لكل عنصر مقارنة بحساب مشابه بدونه، محسوبة شهرياً بانحدار هيدوني على آلاف الإعلانات. اضغط أي عنصر لعرض منحناه الزمني.
+                    </p>
+
+                    <div id="itemIndexTrendCards" class="market-summary-grid margin-top-1">
+                        <!-- Injected via JS: rising/falling/stable counters -->
+                    </div>
+
+                    <div class="charts-grid margin-top-2">
+                        <div class="chart-card chart-full">
+                            <div class="chart-header">
+                                <h3><i class="fa-solid fa-wave-square color-emerald"></i> المنحنى الزمني للعنصر</h3>
+                                <select id="itemIndexSelect" class="item-select"></select>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="itemIndexChart"></canvas>
+                            </div>
+                            <div id="itemIndexMeta" class="margin-top-1 section-desc"><!-- JS --></div>
+                        </div>
+                    </div>
+
+                    <div class="margin-top-2">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-ranking-star color-amber"></i> لوحة صدارة العناصر (القيمة الحالية)</h3>
+                        </div>
+                        <div id="itemIndexTableContainer" class="table-responsive"><!-- JS --></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- TAB 6: LIVE DEALS + TRUST (Phase 4)        -->
+            <!-- ========================================== -->
+            <section id="dealsTab" class="tab-content">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2>
+                            <i class="fa-solid fa-crosshairs color-rose"></i>
+                            الصيد الحي وتصنيف ثقة القنوات
+                        </h2>
+                        <span id="liveFeedStatus" class="badge badge-purple">
+                            <i class="fa-solid fa-plug-circle-xmark"></i> غير متصل
+                        </span>
+                    </div>
+
+                    <div class="card-header margin-top-1">
+                        <h3><i class="fa-solid fa-satellite-dish color-cyan"></i> تدفق الصيد الحي (Live Deals)</h3>
+                    </div>
+                    <div id="liveDealsFeed" class="live-deals-feed">
+                        <div class="feed-empty">في انتظار أول صفقة... 🎯</div>
+                    </div>
+
+                    <div class="card-header margin-top-2">
+                        <h3><i class="fa-solid fa-repeat color-purple"></i> تحليل إعادة النشر (Repost Analytics)</h3>
+                    </div>
+                    <div id="repostSummaryGrid" class="market-summary-grid margin-top-1">
+                        <!-- Injected via JS -->
+                    </div>
+                    <div id="topRepostsTableContainer" class="table-responsive margin-top-1"><!-- JS --></div>
+
+                    <div class="card-header margin-top-2">
+                        <h3><i class="fa-solid fa-shield-halved color-emerald"></i> تصنيف ثقة القنوات (Channel Trust)</h3>
+                    </div>
+                    <div id="trustTableContainer" class="table-responsive margin-top-1"><!-- JS --></div>
                 </div>
             </section>
 

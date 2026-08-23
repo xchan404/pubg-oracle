@@ -77,6 +77,8 @@ function initTabs() {
             if (tabId === 'marketTab') loadMarketTrends();
             if (tabId === 'heatmapTab') loadHeatmap();
             if (tabId === 'mlopsTab') loadMLOpsTelemetry();
+            if (tabId === 'itemIndexTab') loadItemIndex();
+            if (tabId === 'dealsTab') loadDealsTrust();
         });
     });
 }
@@ -718,4 +720,189 @@ async function triggerRetrain() {
         btn.disabled = false;
         btn.innerHTML = oldText;
     }
+}
+
+/* ==========================================================================
+   PHASE 4 — ITEM PRICE EXCHANGE, LIVE DEALS FEED, TRUST & REPOST ANALYTICS
+   ========================================================================== */
+
+let itemIndexData = null;
+let itemIndexChartInstance = null;
+
+async function loadItemIndex() {
+    const select = document.getElementById('itemIndexSelect');
+    if (!select) return;
+    const refreshBtn = document.getElementById('refreshItemIndexBtn');
+    if (refreshBtn && !refreshBtn.dataset.bound) {
+        refreshBtn.addEventListener('click', loadItemIndex);
+        refreshBtn.dataset.bound = '1';
+    }
+    if (!select.dataset.loaded) {
+        select.addEventListener('change', renderItemIndexChart);
+    }
+    try {
+        const res = await fetch('/market/item-index');
+        itemIndexData = (await res.json()).items;
+    } catch (err) { console.error('item index error:', err); return; }
+
+    const ids = Object.keys(itemIndexData).sort((a, b) =>
+        Math.abs(itemIndexData[b].current_uplift_egp) - Math.abs(itemIndexData[a].current_uplift_egp));
+
+    // Trend counter cards
+    const counts = { rising: 0, falling: 0, stable: 0 };
+    ids.forEach(id => counts[itemIndexData[id].trend]++);
+    document.getElementById('itemIndexTrendCards').innerHTML = `
+        <div class="summary-card"><div class="summary-icon icon-emerald"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div class="summary-info"><span class="summary-label">عناصر صاعدة</span><h3 class="summary-value">${counts.rising}</h3><span class="summary-sub">الطلب بيزيد عليها</span></div></div>
+        <div class="summary-card"><div class="summary-icon icon-amber"><i class="fa-solid fa-minus"></i></div>
+            <div class="summary-info"><span class="summary-label">مستقرة</span><h3 class="summary-value">${counts.stable}</h3><span class="summary-sub">سعر ثابت نسبياً</span></div></div>
+        <div class="summary-card"><div class="summary-icon icon-cyan"><i class="fa-solid fa-arrow-trend-down"></i></div>
+            <div class="summary-info"><span class="summary-label">عناصر هابطة</span><h3 class="summary-value">${counts.falling}</h3><span class="summary-sub">فرصة شراء محتملة</span></div></div>`;
+
+    select.innerHTML = ids.map(id =>
+        `<option value="${id}">${id} (${itemIndexData[id].current_uplift_egp >= 0 ? '+' : ''}${itemIndexData[id].current_uplift_egp} EGP)</option>`).join('');
+    select.dataset.loaded = '1';
+
+    // Leaderboard table
+    const rows = ids.slice(0, 15).map(id => {
+        const c = itemIndexData[id];
+        const arrow = c.trend === 'rising' ? '<i class="fa-solid fa-arrow-up color-emerald"></i>'
+            : c.trend === 'falling' ? '<i class="fa-solid fa-arrow-down color-rose"></i>'
+            : '<i class="fa-solid fa-equals color-muted"></i>';
+        return `<tr><td><b>${id}</b></td>
+            <td>${c.current_uplift_egp >= 0 ? '+' : ''}${c.current_uplift_egp.toLocaleString()} EGP</td>
+            <td>${arrow} ${c.trend}</td>
+            <td>${c.median_price_with_item ? c.median_price_with_item.toLocaleString() : '--'}</td>
+            <td>${c.share_of_listings_pct}%</td>
+            <td>${c.total_observations.toLocaleString()}</td></tr>`;
+    }).join('');
+    document.getElementById('itemIndexTableContainer').innerHTML =
+        `<table class="data-table"><thead><tr><th>العنصر</th><th>القيمة الحالية</th><th>الاتجاه</th><th>وسيط سعر حساب به</th><th>انتشاره</th><th>مشاهدات التدريب</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    renderItemIndexChart();
+}
+
+function renderItemIndexChart() {
+    if (!itemIndexData) return;
+    const id = document.getElementById('itemIndexSelect').value || 'glacier_m416';
+    const card = itemIndexData[id];
+    if (!card) return;
+
+    document.getElementById('itemIndexMeta').innerHTML =
+        `آخر تحديث: <b>${card.last_month}</b> • مشاهدات: ${card.total_observations.toLocaleString()} • وسيط السعر معه: <b>${(card.median_price_with_item || 0).toLocaleString()}</b> EGP`;
+
+    const ctx = document.getElementById('itemIndexChart');
+    const labels = card.series.map(p => p.month);
+    const values = card.series.map(p => p.uplift_egp);
+    if (itemIndexChartInstance) itemIndexChartInstance.destroy();
+    itemIndexChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [{
+            label: `${id} (EGP uplift)`,
+            data: values,
+            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent-cyan') || '#22d3ee',
+            backgroundColor: 'rgba(34,211,238,0.12)',
+            fill: true, tension: 0.35, pointRadius: 4, pointHoverRadius: 7 }] },
+        options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { ticks: { callback: v => v.toLocaleString() } } } }
+    });
+}
+
+/* ── Live Deals Feed + Reposts + Trust ───────────────────── */
+
+let dealsSocket = null;
+
+function setLiveFeedStatus(connected) {
+    const el = document.getElementById('liveFeedStatus');
+    if (!el) return;
+    el.innerHTML = connected
+        ? '<i class="fa-solid fa-circle-dot color-emerald"></i> متصل — بث حي'
+        : '<i class="fa-solid fa-plug-circle-xmark"></i> غير متصل';
+}
+
+function appendDealCard(deal) {
+    const feed = document.getElementById('liveDealsFeed');
+    if (!feed) return;
+    feed.querySelector('.feed-empty')?.remove();
+    const asked = deal.asked_price != null ? `${Number(deal.asked_price).toLocaleString()} ج.م` : 'بدون سعر';
+    const profit = deal.profit != null ? Number(deal.profit).toLocaleString() : '؟';
+    const ratingIcon = (deal.deal_rating || '').includes('اشترِ') ? '🔥' :
+                       (deal.deal_rating || '').includes('غالي') ? '❄️' : '👍';
+    const div = document.createElement('div');
+    div.className = 'deal-card';
+    div.innerHTML = `
+        <div class="deal-head">
+            <span class="deal-rating">${ratingIcon}</span>
+            <a href="${deal.message_link || '#'}" target="_blank" class="deal-title">${escapeHtml(deal.chat_title || 'قناة')}</a>
+            <span class="deal-time muted">${new Date(deal.received_at).toLocaleTimeString()}</span>
+        </div>
+        <div class="deal-body">
+            <span>مطلوب: <b>${asked}</b></span>
+            <span>عادل: <b class="color-cyan">${Number(deal.fair_value).toLocaleString()}</b></span>
+            <span>مكسب: <b class="${(deal.profit||0) > 0 ? 'color-emerald' : 'color-rose'}">${profit}</b></span>
+        </div>`;
+    feed.prepend(div);
+    while (feed.children.length > 30) feed.lastChild.remove();
+}
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function initLiveFeed() {
+    if (dealsSocket) return;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    try {
+        dealsSocket = new WebSocket(`${proto}://${location.host}/ws/deals`);
+    } catch (e) { console.error(e); return; }
+    dealsSocket.onopen = () => setLiveFeedStatus(true);
+    dealsSocket.onclose = () => { setLiveFeedStatus(false); dealsSocket = null; };
+    dealsSocket.onerror = () => setLiveFeedStatus(false);
+    dealsSocket.onmessage = ev => {
+        try { appendDealCard(JSON.parse(ev.data)); } catch (_) {}
+    };
+}
+
+async function loadDealsTrust() {
+    initLiveFeed();
+
+    try {
+        const rep = await (await fetch('/market/reposts')).json();
+        const grid = document.getElementById('repostSummaryGrid');
+        if (grid) {
+            grid.innerHTML = `
+                <div class="summary-card"><div class="summary-icon icon-purple"><i class="fa-solid fa-fingerprint"></i></div>
+                    <div class="summary-info"><span class="summary-label">حسابات فريدة</span><h3 class="summary-value">${rep.unique_accounts?.toLocaleString() || '--'}</h3><span class="summary-sub">من ${rep.total_listings?.toLocaleString() || '--'} إعلان</span></div></div>
+                <div class="summary-card"><div class="summary-icon icon-amber"><i class="fa-solid fa-repeat"></i></div>
+                    <div class="summary-info"><span class="summary-label">نسبة المُعاد نشرهم</span><h3 class="summary-value">${rep.repost_share_pct || 0}%</h3><span class="summary-sub">أعلى تكرار: ${rep.max_reposts_observed || 0} مرة</span></div></div>
+                <div class="summary-card"><div class="summary-icon icon-emerald"><i class="fa-solid fa-calendar-days"></i></div>
+                    <div class="summary-info"><span class="summary-label">وسيط أيام العرض</span><h3 class="summary-value">${rep.median_days_on_market_reposted ?? '--'}</h3><span class="summary-sub">للحسابات المعاد نشرها</span></div></div>
+                <div class="summary-card"><div class="summary-icon icon-cyan"><i class="fa-solid fa-check-double"></i></div>
+                    <div class="summary-info"><span class="summary-label">علامات تم البيع</span><h3 class="summary-value">${rep.sold_marker_accounts || 0}</h3><span class="summary-sub">حسابات اتباععت فعلاً</span></div></div>`;
+        }
+        const tbody = (rep.top_reposts || []).map((t, i) => `
+            <tr><td>${i + 1}</td><td><code>${t.fingerprint}</code></td><td>${t.posts}</td>
+            <td>${(t.channels || []).join(', ')}</td><td>${t.days_on_market}</td>
+            <td>${t.price_first ? t.price_first.toLocaleString() : '--'} → ${t.price_last ? t.price_last.toLocaleString() : '--'}</td>
+            <td>${t.still_listed ? '🟢 معروض' : '🔴 مبيع'}</td></tr>`).join('');
+        const tbl = document.getElementById('topRepostsTableContainer');
+        if (tbl) tbl.innerHTML = `<table class="data-table"><thead><tr><th>#</th><th>البصمة</th><th>مرات النشر</th><th>القنوات</th><th>أيام</th><th>مسار السعر</th><th>الحالة</th></tr></thead><tbody>${tbody}</tbody></table>`;
+    } catch (err) { console.error('reposts error:', err); }
+
+    try {
+        const tr = await (await fetch('/market/channels/trust')).json();
+        const gradeColor = g => ({ 'A+': 'color-emerald', A: 'color-emerald', B: 'color-amber', C: 'color-orange', D: 'color-rose' }[g] || '');
+        const rows = (tr.channels || []).map(c => `
+            <tr><td><b>${escapeHtml(c.channel)}</b></td>
+            <td class="${gradeColor(c.grade)}"><b>${c.trust_score}</b> (${c.grade})</td>
+            <td>${c.n_ads.toLocaleString()}</td>
+            <td>${(c.components.middleman_ratio * 100).toFixed(0)}%</td>
+            <td>${(c.components.internal_linkage_ratio * 100).toFixed(0)}%</td>
+            <td>${(c.components.spam_ratio * 100).toFixed(1)}%</td>
+            <td>${(c.components.repost_flood_ratio * 100).toFixed(0)}%</td>
+            <td>${c.stats.ads_per_week}/يوم</td></tr>`).join('');
+        const el = document.getElementById('trustTableContainer');
+        if (el) el.innerHTML = `<table class="data-table"><thead><tr><th>القناة</th><th>الثقة</th><th>إعلانات</th><th>وسيط</th><th>ربط داخلي</th><th>سبام</th><th>فيضان repost</th><th>نشاط</th></tr></thead><tbody>${rows}</tbody></table>`;
+    } catch (err) { console.error('trust error:', err); }
 }

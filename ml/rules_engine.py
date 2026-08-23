@@ -7,6 +7,7 @@ Extracted from ml/predict.py (Phase 0). Behavior-preserving by design:
 every threshold/amount mirrors the legacy hard-coded logic exactly.
 """
 
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -15,7 +16,48 @@ from typing import Any
 
 import yaml
 
-DEFAULT_RULES_PATH = Path(__file__).resolve().parent.parent / "config" / "pricing_rules.yaml"
+DEFAULT_RULES_PATH = Path(os.getenv("PRICING_RULES_PATH",
+                                     str(Path(__file__).resolve().parent.parent / "config" / "pricing_rules.yaml")))
+
+REQUIRED_RULE_KEYS = ("rare_premiums", "stat_premiums", "caps", "confidence", "blend", "flipping")
+
+
+def validate_rules_text(text: str) -> tuple[dict, list[str]]:
+    """
+    Parses candidate pricing-rules YAML and returns (rules, errors).
+    Empty errors means the text is structurally acceptable for hot-reload.
+    """
+    errors: list[str] = []
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as e:
+        return {}, [f"YAML parse error: {e}"]
+    if not isinstance(data, dict):
+        return {}, ["Top level must be a mapping"]
+    for key in REQUIRED_RULE_KEYS:
+        if key not in data:
+            errors.append(f"Missing required section: {key}")
+    caps = data.get("caps") or {}
+    if isinstance(caps, dict):
+        if "no_m4" not in caps or "with_m4" not in caps:
+            errors.append("caps must contain 'no_m4' and 'with_m4' groups")
+        else:
+            for group in ("no_m4", "with_m4"):
+                if not isinstance(caps.get(group), list) or not caps.get(group):
+                    errors.append(f"caps.{group} must be a non-empty list")
+    blend = data.get("blend") or {}
+    if isinstance(blend, dict):
+        for seg in ("cheap", "expensive"):
+            b = blend.get(seg)
+            if not isinstance(b, dict) or "weights" not in b or "segment" not in b:
+                errors.append(f"blend.{seg} requires weights + segment")
+    conf = data.get("confidence") or {}
+    if isinstance(conf, dict) and "labels" not in conf:
+        errors.append("confidence.labels missing")
+    flip = data.get("flipping") or {}
+    if isinstance(flip, dict) and "tiers" not in flip:
+        errors.append("flipping.tiers missing")
+    return data, errors
 
 
 # ─────────────────────────────────────────────────────────────────────
