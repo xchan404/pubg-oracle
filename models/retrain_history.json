@@ -1,0 +1,42 @@
+[
+  {
+    "timestamp": "2026-07-23T09:45:36.691305+00:00",
+    "trigger": "check",
+    "dataset_rows": 56006,
+    "new_rows_since_last": 56006,
+    "threshold": 5000,
+    "status": "checked",
+    "retrain_needed": true,
+    "message": "Check completed. Retrain needed: True"
+  },
+  {
+    "timestamp": "2026-07-23T09:45:53.582489+00:00",
+    "trigger": "check",
+    "dataset_rows": 56006,
+    "new_rows_since_last": 0,
+    "threshold": 5000,
+    "status": "checked",
+    "retrain_needed": false,
+    "message": "Check completed. Retrain needed: False"
+  },
+  {
+    "timestamp": "2026-07-23T09:46:00.834700+00:00",
+    "trigger": "scheduled_check",
+    "dataset_rows": 56006,
+    "new_rows_since_last": 0,
+    "threshold": 5000,
+    "status": "skipped",
+    "mae": 1450.25,
+    "message": "Skipped retraining. New rows (0) < threshold (5000)."
+  },
+  {
+    "timestamp": "2026-07-23T09:46:07.862759+00:00",
+    "trigger": "check",
+    "dataset_rows": 56006,
+    "new_rows_since_last": 0,
+    "threshold": 5000,
+    "status": "checked",
+    "retrain_needed": true,
+    "message": "Check completed. Retrain needed: True"
+  }
+]
