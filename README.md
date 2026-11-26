@@ -55,7 +55,7 @@ python -m pytest -q
 5. Bootstrap the instance (Docker, Compose, clone repo). Before the first `up`, prepare the EBS mount and seed models:
 
 ```bash
-sudo mkdir -p /mnt/pubg-data/{models,db,sessions}
+sudo mkdir -p /mnt/pubg-data/{models,data,sessions}
 sudo chown -R 1000:1000 /mnt/pubg-data
 git clone https://github.com/xchan404/pubg-oracle.git && cd pubg-oracle
 cp .env.example .env   # fill in real values locally, never commit
