@@ -1,5 +1,6 @@
 ﻿# Core runtime dependencies (pinned to tested versions)
 aiohttp==3.13.5
+boto3==1.35.0
 catboost==1.2.10
 fastapi==0.136.0
 joblib==1.5.2

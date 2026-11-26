@@ -1,128 +1,104 @@
-# ساحب منشورات حسابات ببجي من قنوات تلجرام (PUBG Mobile Telegram Scraper)
+# PUBG Oracle — AI Account Valuation & Market Intelligence
 
-نظام سحب وتجميع منشورات بيع حسابات ببجي موبايل (PUBG Mobile) من قنوات ومجموعات تلجرام العامة والخاصة باستخدام Python ومكتبة Telethon غير المتزامنة، وحفظها مباشرة في قاعدة بيانات SQLite محلية وتصديرها تلقائياً لملفات CSV و JSON. 
+PUBG Oracle evaluates PUBG Mobile account listings scraped from Telegram channels and returns a fair price, an expected range, and a security/transferability report. It combines an Arabic NLP parser, an XGBoost/CatBoost/LightGBM ensemble, conformal intervals, and a market-intelligence layer (item index, repost analytics, channel trust). A FastAPI backend serves a web dashboard, a Telegram bot, and an admin panel.
 
-تم تصميم وتطوير هذا النظام بجودة عالية كأداة متكاملة وذكية لجمع البيانات وإعداد أضخم Dataset ممكنة لتدريب نماذج الذكاء الاصطناعي (AI Models) لتقييم وتسعير الحسابات لاحقاً.
+**Proposal:** CSE363 — Cloud Computing project, Milestone B (working local multi-container system + AWS evidence).
 
----
+## Architecture
 
-## ✨ المميزات الرئيسية (Key Features)
-
-1. **سحب غير متزامن فائق السرعة**: مبني بالكامل على `async/await` ومكتبة `Telethon` لتوفير أقصى سرعة ممكنة دون التأثير على استقرار النظام.
-2. **التعامل الاحترافي مع حدود الطلبات (Rate Limits)**: الكود يلتقط أخطاء `FloodWaitError` تلقائياً، ويدخل في وضع النوم الذكي للفترة المطلوبة بدقة ثم يستأنف العمل بمرونة.
-3. **تجنب التكرار نهائياً (Deduplication)**: يتم تطبيق قيود فريدة (Unique Constraints) مركبة على معرف الرسالة واسم القناة لمنع تكرار أي رسالة في قاعدة البيانات والملفات الاحتياطية.
-4. **دعم استكمال السحب (Checkpoints)**: في حال انقطاع اتصال الإنترنت أو توقف السكربت، يتم حفظ آخر رسالة تم سحبها بنجاح لكل قناة، وعند إعادة التشغيل يستكمل السكربت السحب بدقة من حيث توقف.
-5. **تصفية دقيقة للتواريخ**: يدعم جلب البيانات للنطاق الزمني المطلق (2025-2026)، مع ميزة التوقف التلقائي الذكي فور انتهاء النطاق لتوفير موارد الاتصال والـ API.
-6. **سحب القنوات الخاصة والعامة**: يدعم النظام فك تشفير روابط القنوات العامة والخاصة (روابط الدعوة مثل `https://t.me/+hash`)، ومحاولة الانضمام التلقائي لها أو البحث عنها في محادثاتك النشطة.
-7. **الحفاظ على المساحة وسرعة السحب**: تم تهيئة السكربت لتخطي تحميل الصور والفيديوهات محلياً، مع الاحتفاظ ببياناتها الفوقية (هل تحتوي على صورة؟ هل هي ميديا مجمعة؟).
-8. **تصدير مزدوج وتلقائي**: فور انتهاء السحب لكل قناة، يتم تحديث وتصدير نسختين احتياطيتين بصيغة CSV وصيغة JSON (مع الحفاظ التام على النصوص العربية الأصلية بوضوح وبدون تشفير `ensure_ascii=False`).
-
----
-
-## 📂 هيكل المجلدات الناتج (Folder Structure)
-
-عند تشغيل السكربت لأول مرة، يقوم تلقائياً ببناء المجلدات وهيكلتها كالتالي:
-
-```text
-├── config.py              # ملف إدارة الإعدادات وضمان المجلدات وتحليل الروابط
-├── database.py            # ملف إدارة SQLite والجداول ونقاط التوقف والنسخ
-├── scraper.py             # محرك السحب والتحكم بالاتصال والـ Rate Limits
-├── main.py                # الموزع الرئيسي وبوابات الـ CLI Args
-├── requirements.txt       # المكتبات الخارجية المطلوبة
-├── .env                   # ملف سري يحتوي على بيانات الـ API الخاصة بك
-├── .env.template          # نموذج مرجعي لملف الإعدادات البيئية
-├── data/                  # مجلد البيانات الرئيسي (يُنشأ تلقائياً)
-│   ├── raw/
-│   │   ├── sqlite/
-│   │   │   └── pubg_accounts.db     # قاعدة البيانات الشاملة
-│   │   ├── csv/
-│   │   │   └── [ChannelName].csv    # نسخة احتياطية بصيغة CSV لكل قناة
-│   │   └── json/
-│   │       └── [ChannelName].json   # نسخة احتياطية بصيغة JSON لكل قناة
-└── logs/                  # مجلد السجلات والـ Logs (يُنشأ تلقائياً)
-    └── scraper.log        # سجل تفصيلي للعمليات والتقدم والأخطاء
+```
+┌────────────┐     ┌────────────┐     ┌────────────┐
+│   api      │◄────│    bot     │     │ scheduler  │
+│  FastAPI   │     │  Telethon  │     │  (loop)    │
+│  :8000     │◄────│            │     │            │
+└─────┬──────┘     └────────────┘     └─────┬──────┘
+      │                                      │
+      ▼                                      ▼
+┌─────────────────────────────────────────────────┐
+│  data/ (SQLite + CSV/JSON)   models/ (joblib)  │
+│  S3 (exports, models) when configured          │
+└─────────────────────────────────────────────────┘
 ```
 
----
+Data flow: Telegram listings → scraper → SQLite + CSV/JSON → parser/NLP features → ensemble pricer → fair value + range + security report. Scheduler rebuilds the training dataset, checks drift, and runs lifecycle (expiry, reminders, digest). Bot pushes live deals and serves the paywall.
 
-## 🚀 طريقة التثبيت والإعداد (Setup & Installation)
+## Prerequisites
 
-### 1. الحصول على مفاتيح Telegram API
-لتتمكن من تشغيل السكربت، يجب الحصول على `api_id` و `api_hash` من تليجرام باتباع الآتي:
-1. اذهب إلى الموقع الرسمي: [https://my.telegram.org](https://my.telegram.org) وسجل دخولك برقم هاتفك.
-2. اختر **API development tools**.
-3. قم بإنشاء تطبيق جديد (يمكنك وضع أي اسم عادي مثل `PUBG Scraper`).
-4. سيظهر لك مباشرة كود الـ `App api_id` والـ `App api_hash`.
+- Docker + Docker Compose
+- AWS Academy Learner Lab (for EC2/EBS/S3 evidence)
+- Telegram API credentials (`API_ID`, `API_HASH` from https://my.telegram.org)
+- Python 3.12 (for local dev without Docker)
 
-### 2. تثبيت المتطلبات البرمجية
-افتح محطة الأوامر (Terminal/CMD) في مجلد المشروع وقم بتنفيذ الأوامر التالية:
+## Local quickstart
 
 ```bash
-# 1. إنشاء بيئة عمل افتراضية (موصى به)
-python -m venv venv
+cp .env.example .env
+# fill in API_ID, API_HASH, BOT_TOKEN, MY_CHAT_ID, etc.
+docker compose up --build
+```
 
-# 2. تفعيل بيئة العمل الافتراضية
-# على نظام Windows:
-venv\Scripts\activate
-# على أنظمة Linux/macOS:
-source venv/bin/activate
+Open the dashboard at http://localhost:8000 and the bot in Telegram. Admin panel: http://localhost:8000/admin (token from `ADMIN_DASHBOARD_TOKEN`).
 
-# 3. تثبيت المكتبات المطلوبة
+Run tests:
+
+```bash
 pip install -r requirements.txt
+python -m pytest -q
 ```
 
-### 3. إعداد ملف المتغيرات البيئية (.env)
-لقد قمنا بإعداد ملف `.env` الخاص بك تلقائياً بالبيانات التي وفرتها. للتأكيد، يجب أن يحتوي الملف `.env` على الآتي:
-```env
-TELEGRAM_API_ID=38619719
-TELEGRAM_API_HASH=7b825f449aa9b486febe53b7dd2ea644
-TELEGRAM_SESSION_NAME=pubg_scraper_session
-```
+## AWS deployment (EC2 + EBS + S3)
 
----
-
-## 💻 طريقة استخدام السكربت (Usage Guide)
-
-### التشغيل الأساسي بالخيار الافتراضي
-يقوم هذا الأمر بتهيئة الجداول، والاتصال بحسابك في تليجرام (سيطلب منك رقم هاتفك وكود التحقق لمرة واحدة فقط لإنشاء ملف الجلسة الآمن `pubg_scraper_session.session` للاستخدامات اللاحقة)، ثم سحب قنوات البداية الافتراضية للسنوات 2025 و 2026:
+1. Create a VPC with a public subnet (10.0.1.0/24, route to IGW) and a private subnet (10.0.2.0/24, no IGW route). Security group: port 8000 from anywhere (demo), port 22 from your IP only.
+2. Launch an EC2 instance (Amazon Linux 2023 or Ubuntu) and attach the `LabInstanceProfile` IAM role.
+3. Create a 20 GiB gp3 EBS volume in the same AZ, attach, format (`mkfs -t xfs`), mount at `/mnt/pubg-data`, add to `/etc/fstab`.
+4. Create the S3 bucket with versioning ON and Block Public Access all ON.
+5. Bootstrap the instance (Docker, Compose, clone repo), then deploy:
 
 ```bash
-python main.py
+git clone https://github.com/xchan404/pubg-oracle.git && cd pubg-oracle
+cp .env.example .env   # fill in real values locally, never commit
+docker compose -f docker-compose.yml -f compose.aws.yaml up -d --build
+docker compose ps
+curl http://localhost:8000/market/summary
 ```
 
-### استخدام معاملات التحكم المتقدمة (CLI Arguments)
+## Configuration
 
-يمكنك تخصيص القنوات أو تواريخ السحب بسهولة عبر الـ Command Line:
+| Variable | Purpose |
+|---|---|
+| `API_ID` / `API_HASH` | Telegram API credentials (read by config.py) |
+| `TELEGRAM_SESSION_NAME` | Telethon session file name |
+| `BOT_TOKEN` | Telegram bot token (bot + background jobs) |
+| `MY_CHAT_ID` | Owner chat id for admin alerts and payment review |
+| `VODAFONE_CASH_NUMBER` / `INSTAPAY_HANDLE` | Manual payment collection details |
+| `MIN_PROFIT_THRESHOLD` | Minimum profit (EGP) for deal alerts |
+| `TARGET_CHATS` | Comma-separated target chats for the bot |
+| `INTERNAL_TOKEN` | Token for bot → API deal push |
+| `SCHEDULER_INTERVAL_MINUTES` | Scheduler cadence (default 360) |
+| `ALLOWED_ORIGINS` | CORS origins (comma-separated) |
+| `S3_BUCKET` | S3 bucket name (empty disables S3) |
+| `AWS_REGION` | AWS region (default us-east-1) |
 
-#### 1. سحب قنوات معينة فقط (مفصولة بفاصلة)
-يدعم روابط تليجرام الكاملة، المعرفات مباشرة، وحتى روابط الدعوة الخاصة:
-```bash
-python main.py --channels "sa3kgaming1,https://t.me/COMMANDOSTORE4,https://t.me/+eYSCPNiMAD4zODU8"
-```
+## Testing
 
-#### 2. تخصيص النطاق الزمني
-سحب البيانات لشهور محددة فقط أو نطاق مخصص:
-```bash
-python main.py --from-date "2026-01-01" --to-date "2026-05-31"
-```
+Run `python -m pytest -q` (210 tests). Test evidence T1–T8 lives in `docs/aws-evidence/` (AWS console/CLI outputs).
 
-#### 3. دمج الخيارات كاملة
-```bash
-python main.py --channels "sa3kgaming1" --from-date "2025-06-01T00:00:00" --to-date "2025-12-31T23:59:59"
-```
+## Troubleshooting
 
----
+- **FloodWait:** Telegram rate limits; the scraper sleeps and resumes automatically.
+- **Model not loaded:** ensure `models/*.pkl` exist; retrain via `/mlops/retrain` or run `ml/train.py`.
+- **Lab session reset / new public IP:** re-run the EC2 bootstrap; update `ALLOWED_ORIGINS`.
+- **Disk full on EBS:** extend the volume or clean `data/` exports.
 
-## 📊 تتبع السجلات والنتائج (Logs & Data Output)
+## Teardown / cleanup
 
-* **السجلات المباشرة**: أثناء تشغيل السكربت، ستشاهد طباعة مباشرة تفصيلية تطلعك على حالة معالجة كل 100 رسالة، وحالة الاتصال والتصدير.
-* **ملف الـ Log**: تجد تقارير تفصيلية وأي أخطاء حدثت مسجلة في `logs/scraper.log`.
-* **البيانات المستهدفة**:
-  * قاعدة البيانات `data/raw/sqlite/pubg_accounts.db` تحوي جداول مرتبة بكامل البيانات الفوقية.
-  * ملفات الـ CSV والـ JSON في مجلدات `data/raw/csv` و `data/raw/json` تصدر وتحدث تلقائياً لكل قناة.
+1. `docker compose down`
+2. Terminate the EC2 instance.
+3. Delete the EBS volume and snapshots.
+4. Empty and delete the S3 bucket.
+5. Verify lab credit stopped moving.
 
----
+## Contribution log & AI assistance
 
-## 🛡️ نصائح للتشغيل الآمن
-* **ملف الجلسة (.session)**: يتم حفظ جلسة تسجيل دخولك بأمان محلياً. لا تشارك ملف الجلسة مع أي شخص لحماية خصوصية حسابك.
-* **تجنب السحب السريع العنيف للقنوات الضخمة**: يفضل عدم تعديل فترات الانتظار (Sleep) لتجنب حظر حسابك مؤقتاً من قبل تليجرام. الإعدادات الحالية تم اختبارها لتكون آمنة ومتوافقة مع خوارزميات تليجرام تماماً.
+- Developed by Mohamed Habib (xchan404).
+- AI assistance (Cursor/Codex) was used for scaffolding, refactoring, and documentation; all code was reviewed and tested by the author. No credentials are committed.

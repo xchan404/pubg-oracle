@@ -368,6 +368,23 @@ def run_retrain_service(check_only: bool = False, force: bool = False, threshold
         "message": f"Retraining completed successfully. New MAE: {new_mae:,.2f} EGP."
     })
 
+    # S3 model artifact upload (no-op when S3_BUCKET is unset).
+    try:
+        from services.s3_store import configured, upload_file
+
+        if configured():
+            import glob
+            import os
+
+            for local in glob.glob(os.path.join(MODELS_DIR, "*.pkl")):
+                upload_file(local, "models/" + os.path.basename(local))
+            if os.path.exists(META_PATH):
+                upload_file(META_PATH, "models/training_meta.json")
+            if os.path.exists(HISTORY_PATH):
+                upload_file(HISTORY_PATH, "models/retrain_history.json")
+    except Exception as e:
+        print(f"[s3-models] FAILED: {e}")
+
     print("\n" + "=" * 60)
     print("   Retraining & Drift Monitoring Service Complete!")
     print("=" * 60)

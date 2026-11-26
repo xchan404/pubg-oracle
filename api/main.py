@@ -36,7 +36,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -378,6 +378,20 @@ def health_data():
     from intelligence.freshness import get_freshness
 
     return get_freshness()
+
+
+# ─── Media (S3 presigned URLs) ───────────────────────────────
+@app.get("/media/{key:path}")
+def media_presigned_url(key: str, expiry: int = 300):
+    """Return a short-lived presigned GET URL for an S3 object."""
+    from services.s3_store import configured, generate_presigned_url
+
+    if not configured():
+        raise HTTPException(status_code=503, detail="S3 is not configured.")
+    url = generate_presigned_url(key, expiry_seconds=max(60, min(expiry, 3600)))
+    if not url:
+        raise HTTPException(status_code=404, detail="Object not found or presign failed.")
+    return {"key": key, "url": url, "expires_in": expiry}
 
 
 # ─── Live Deals Feed (Phase 4) ───────────────────────────────

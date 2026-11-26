@@ -1,0 +1,19 @@
+# AWS override: run with
+#   docker compose -f docker-compose.yml -f compose.aws.yaml up -d
+# Replaces named volumes with EBS bind mounts under /mnt/pubg-data.
+services:
+  api:
+    volumes:
+      - /mnt/pubg-data/models:/app/models
+      - /mnt/pubg-data/data:/app/data
+
+  bot:
+    volumes:
+      - /mnt/pubg-data/models:/app/models
+      - /mnt/pubg-data/data:/app/data
+      - /mnt/pubg-data/sessions:/app/sessions
+
+  scheduler:
+    volumes:
+      - /mnt/pubg-data/models:/app/models
+      - /mnt/pubg-data/data:/app/data

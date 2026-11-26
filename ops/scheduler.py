@@ -74,6 +74,24 @@ def run_cycle() -> None:
         traceback.print_exc()
         print(f"[lifecycle] FAILED: {e}", flush=True)
 
+    # S3 export sync (no-op when S3_BUCKET is unset).
+    try:
+        from services.s3_store import configured, upload_file
+
+        if configured():
+            import os
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            exports = [
+                os.path.join(project_root, "data", "parsed", "csv", "all_parsed_accounts.csv"),
+                os.path.join(project_root, "data", "parsed", "csv", "training_dataset.csv"),
+            ]
+            for local in exports:
+                if os.path.exists(local):
+                    key = "exports/" + os.path.basename(local)
+                    upload_file(local, key)
+    except Exception as e:
+        print(f"[s3-sync] FAILED: {e}", flush=True)
+
     print(f"[{_stamp()}] === scheduler cycle done ===", flush=True)
 
 
