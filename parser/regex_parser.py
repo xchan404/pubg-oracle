@@ -5,6 +5,12 @@
 
 import re
 
+# Sanity bounds for a single PUBG account listing (EGP).
+# Below the floor is almost always a phone fragment; above the ceiling is
+# almost always a seller typo (see the redundant "الف" guard below).
+PRICE_MIN_EGP = 100
+PRICE_MAX_EGP = 2_000_000
+
 
 def _parse_numeric_value(raw_val: str) -> float | None:
     """Helper to convert strings like '15k', '15.5k', '15 الف', '15,000' to float."""
@@ -20,11 +26,15 @@ def _parse_numeric_value(raw_val: str) -> float | None:
         except ValueError:
             pass
 
-    # Check for 'الف' or 'ألف' notation
+    # Check for 'الف' or 'ألف' notation.
+    # Sellers frequently write redundant thousands ("السعر: 84500 الف ج"
+    # meaning 84,500 EGP, not 84.5M). If the number is already >= 1000,
+    # treat it as the full amount instead of multiplying again.
     thousand_match = re.search(r'(\d[\d,\.]*)\s*(?:ألف|الف)\b', val_str, re.IGNORECASE)
     if thousand_match:
         try:
-            return float(thousand_match.group(1).replace(',', '')) * 1000.0
+            num = float(thousand_match.group(1).replace(',', ''))
+            return num if num >= 1000 else num * 1000.0
         except ValueError:
             pass
 
@@ -38,11 +48,65 @@ def _parse_numeric_value(raw_val: str) -> float | None:
 
     return None
 
+# Popularity points ("شعبيه 650k", "60 مليون شعبيه") sit in the same numeric
+# range as account prices and were being sold as 650,000 EGP listings.
+# Mask them before any price logic runs.
+_POPULARITY_AFTER = re.compile(
+    r'(?:ال)?شعبي[هة]\s*[\(\[\{:\-=\s]*\s*\d[\d,\.]*\s*(?:k|الف|ألف|مليون)?',
+    re.IGNORECASE,
+)
+_POPULARITY_BEFORE = re.compile(
+    r'\d[\d,\.]*\s*(?:k|الف|ألف|مليون)?\s*(?:ال)?شعبي[هة]',
+    re.IGNORECASE,
+)
+
+
+def _strip_popularity(text: str) -> str:
+    """Removes popularity-point values so they are never mistaken for prices."""
+    if not text:
+        return text
+    return _POPULARITY_BEFORE.sub(' ', _POPULARITY_AFTER.sub(' ', text))
+
+
+def _price_from_window(search_target: str, price_usd: float | None) -> float | None:
+    """Extracts an EGP price from the text right after a price keyword."""
+    # Try matching EGP explicit pattern: number/shorthand followed by ج/جنيه/EGP/egp
+    egp_explicit = re.search(
+        r'(\d[\d,\.]*\s*(?:k|الف|ألف)?)\s*(?:ج(?:نيه|ينيه)?|EGP|egp)\b',
+        search_target, re.IGNORECASE
+    )
+    if egp_explicit:
+        value = _parse_numeric_value(egp_explicit.group(1))
+        if value:
+            return value
+
+    # If no explicit EGP unit, look for shorthand k notation (e.g. 15k, 2.5k)
+    k_explicit = re.search(r'\b(\d[\d,\.]*\s*k)\b', search_target, re.IGNORECASE)
+    if k_explicit:
+        value = _parse_numeric_value(k_explicit.group(1))
+        if value:
+            return value
+
+    # Otherwise pick the first plausible numeric candidate in the window
+    candidates = re.findall(r'\b\d[\d,\.]*(?:\s*k|\s*الف|\s*ألف)?\b', search_target, re.IGNORECASE)
+    for cand in candidates:
+        v = _parse_numeric_value(cand)
+        if v and v > 100:
+            if price_usd and abs(v - price_usd) < 0.1:
+                continue
+            return v
+    return None
+
+
 def extract_prices(text: str) -> tuple:
     price_egp, price_usd = None, None
+    text = _strip_popularity(text)
 
-    # 1. Direct USD match ($ prefix or suffix, e.g. $150 or 150$)
-    usd_match = re.search(r'(?:\$\s*(\d[\d,\.]*)|(\d[\d,\.]*)\s*\$)', text)
+    # 1. Direct USD match ($ prefix/suffix, USDT, or Arabic "دولار")
+    usd_match = re.search(
+        r'(?:\$\s*(\d[\d,\.]*)|(\d[\d,\.]*)\s*(?:\$|USDT|USD|دولار))',
+        text, re.IGNORECASE
+    )
     if usd_match:
         raw_usd = usd_match.group(1) or usd_match.group(2)
         try:
@@ -51,47 +115,32 @@ def extract_prices(text: str) -> tuple:
             pass
 
     # 2. Look for price after price keywords (السعر, الثمن, price, بكام, etc.)
-    price_kw = r'السعر|الثمن|سعره|بسعر|قيمته|بكام|طالب|price'
-    m = re.search(
+    # Ads often mention "بسعر خرافي" before the real "السعر: 1300", so walk
+    # every keyword window instead of only the first one.
+    price_kw = r'السعر|الثمن|سعره|بسعر|سعر|قيمته|بكام|طالب|price'
+    keyword_matches = list(re.finditer(
         r'(?:' + price_kw + r')\s*[:=\-\u061f:]*\s*(.{1,120})',
         text, re.IGNORECASE
-    )
+    ))
 
-    search_target = m.group(1) if m else text
-
-    # Try matching EGP explicit pattern: number/shorthand followed by ج/جنيه/EGP/egp
-    egp_explicit = re.search(
-        r'(\d[\d,\.]*\s*(?:k|الف|ألف)?)\s*(?:ج(?:نيه|ينيه)?|EGP|egp)\b',
-        search_target, re.IGNORECASE
-    )
-    if egp_explicit:
-        price_egp = _parse_numeric_value(egp_explicit.group(1))
-
-    # If no explicit EGP unit, look for shorthand k notation (e.g. 15k, 2.5k) in price context
-    if not price_egp:
-        k_explicit = re.search(r'\b(\d[\d,\.]*\s*k)\b', search_target, re.IGNORECASE)
-        if k_explicit:
-            price_egp = _parse_numeric_value(k_explicit.group(1))
-
-    # If still no EGP price found and we matched a price keyword line, pick the first valid numeric candidate
-    if not price_egp and m:
-        candidates = re.findall(r'\b\d[\d,\.]*(?:\s*k|\s*الف|\s*ألف)?\b', search_target, re.IGNORECASE)
-        for cand in candidates:
-            v = _parse_numeric_value(cand)
-            if v and v > 100:
-                if price_usd and abs(v - price_usd) < 0.1:
-                    continue
-                price_egp = v
-                break
+    for m in keyword_matches:
+        price_egp = _price_from_window(m.group(1), price_usd)
+        if price_egp:
+            break
 
     # Fallback direct EGP pattern search across the full text
-    if not price_egp and not m:
+    if not price_egp and not keyword_matches:
         direct_egp = re.search(
             r'(\d[\d,\.]*\s*(?:k|الف|ألف)?)\s*(?:ج(?:نيه|ينيه)?|EGP|egp)\b',
             text, re.IGNORECASE
         )
         if direct_egp:
             price_egp = _parse_numeric_value(direct_egp.group(1))
+
+    # Final sanity gate: reject fragments and seller typos rather than
+    # letting them poison the training set / market index.
+    if price_egp is not None and not (PRICE_MIN_EGP <= price_egp <= PRICE_MAX_EGP):
+        price_egp = None
 
     return price_egp, price_usd
 

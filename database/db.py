@@ -41,6 +41,18 @@ def init_db():
                     updated_at TEXT NOT NULL
                 )
             """)
+
+        # Existing databases predate the model constraint; add the index
+        # defensively. If historical duplicates exist, log and continue.
+        try:
+            with engine.begin() as conn:
+                conn.exec_driver_sql("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_parsed_channel_message
+                    ON parsed_accounts (channel_username, message_id)
+                """)
+        except Exception as idx_err:
+            logger.warning(f"Could not create parsed_accounts unique index: {idx_err}")
+
         logger.info("Database initialized successfully with SQLAlchemy models.")
     except Exception as e:
         logger.error(f"Error initializing DB: {e}")

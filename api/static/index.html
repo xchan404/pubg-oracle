@@ -3,441 +3,425 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUBG Mobile AI Market Intelligence & Account Valuation | منصة تسعير وتحليل حسابات ببجي</title>
-    
-    <!-- Google Fonts: Cairo, Plus Jakarta Sans, Inter -->
+    <title>PUBG Oracle — تقييم وتسعير حسابات ببجي موبايل</title>
+    <meta name="description" content="تقييم سعر حسابات ببجي موبايل من إعلانات تليجرام الحقيقية: سعر عادل، نطاق متوقع، وتقرير أمان للروابط.">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-    <!-- App Styles -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <!-- Ambient Dynamic Background Orbs -->
-    <div class="ambient-bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
+<div class="app">
 
-    <div class="app-wrapper">
-        <!-- Top System Bar -->
-        <div class="top-status-bar">
-            <div class="status-indicator">
-                <span class="pulse-dot"></span>
-                <span>محرك الذكاء الاصطناعي نشط (Ensemble ML v2.0)</span>
-            </div>
-            <div class="top-metrics-ticker">
-                <span><i class="fa-solid fa-database color-cyan"></i> <b>12,450+</b> حساب محلل</span>
-                <span class="dot-divider">•</span>
-                <span><i class="fa-solid fa-bolt color-amber"></i> XGBoost + CatBoost + LightGBM</span>
-                <span class="dot-divider">•</span>
-                <span><i class="fa-brands fa-telegram color-blue"></i> 10+ قنوات تليجرام</span>
-            </div>
-        </div>
+    <!-- ── Top bar ─────────────────────────────────────────────── -->
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="#evaluatorTab" aria-label="PUBG Oracle">
+                <span class="brand-mark"><i data-lucide="crosshair"></i></span>
+                <span class="brand-text">
+                    <span class="brand-name">PUBG <b>Oracle</b></span>
+                    <span class="brand-sub">تسعير حسابات ببجي موبايل</span>
+                </span>
+            </a>
 
-        <!-- Main Header -->
-        <header class="main-header">
-            <div class="brand-container">
-                <div class="brand-icon">
-                    <i class="fa-solid fa-crosshairs"></i>
-                </div>
-                <div class="brand-text">
-                    <h1 class="brand-title">PUBG <span class="gradient-text">Market Intelligence</span></h1>
-                    <p class="brand-subtitle">منصة تقييم الحسابات بالذكاء الاصطناعي وتحليل حركة السوق الرقمي</p>
-                </div>
-            </div>
-
-            <!-- Navigation Tabs -->
-            <nav class="nav-tabs">
-                <button class="tab-btn active" data-tab="evaluatorTab">
-                    <i class="fa-solid fa-calculator"></i>
-                    <span>تقييم حساب</span>
+            <nav class="nav" aria-label="أقسام المنصة">
+                <button class="nav-btn active" data-tab="evaluatorTab">
+                    <i data-lucide="calculator"></i><span>تقييم حساب</span>
                 </button>
-                <button class="tab-btn" data-tab="marketTab">
-                    <i class="fa-solid fa-chart-pie"></i>
-                    <span>مؤشرات السوق</span>
+                <button class="nav-btn" data-tab="marketTab">
+                    <i data-lucide="chart-column"></i><span>السوق</span>
                 </button>
-                <button class="tab-btn" data-tab="itemIndexTab">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <span>بورصة العناصر</span>
+                <button class="nav-btn" data-tab="itemIndexTab">
+                    <i data-lucide="chart-line"></i><span>بورصة العناصر</span>
                 </button>
-                <button class="tab-btn" data-tab="dealsTab">
-                    <i class="fa-solid fa-crosshairs"></i>
-                    <span>الصيد الحي والثقة</span>
+                <button class="nav-btn" data-tab="dealsTab">
+                    <i data-lucide="shield-check"></i><span>الصفقات والثقة</span>
                 </button>
-                <button class="tab-btn" data-tab="heatmapTab">
-                    <i class="fa-solid fa-fire"></i>
-                    <span>مصفوفة الندرة والطلب</span>
+                <button class="nav-btn" data-tab="heatmapTab">
+                    <i data-lucide="flame"></i><span>الطلب والندرة</span>
                 </button>
-                <button class="tab-btn" data-tab="mlopsTab">
-                    <i class="fa-solid fa-microchip"></i>
-                    <span>مركز MLOps والانحراف</span>
+                <button class="nav-btn" data-tab="mlopsTab">
+                    <i data-lucide="activity"></i><span>حالة النظام</span>
                 </button>
             </nav>
-        </header>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
+            <div class="topbar-side">
+                <span id="dataChip" class="data-chip" title="حالة تحديث البيانات">
+                    <span class="pulse-dot"></span>
+                    <span id="sysFreshness">—</span>
+                </span>
+            </div>
+        </div>
+    </header>
 
-            <!-- ========================================== -->
-            <!-- TAB 1: ACCOUNT EVALUATOR                   -->
-            <!-- ========================================== -->
-            <section id="evaluatorTab" class="tab-content active">
-                <div class="glass-card main-eval-card">
-                    <div class="card-header">
-                        <h2>
-                            <i class="fa-solid fa-magnifying-glass-dollar color-amber"></i>
-                            تقييم حساب ببجي موبايل (Account Evaluator)
-                        </h2>
-                        <span class="badge badge-purple">NLP Arabic Parser</span>
-                    </div>
-
-                    <!-- Presets & Fast Samples -->
-                    <div class="presets-section">
-                        <span class="presets-title"><i class="fa-solid fa-wand-magic-sparkles"></i> نماذج جاهزة للتجربة السريعة:</span>
-                        <div class="preset-buttons">
-                            <button class="preset-btn" data-preset="glacier">
-                                🧊 امفور تلجي MAX + مومياء + وش البنت
-                            </button>
-                            <button class="preset-btn" data-preset="xsuit">
-                                👑 بدلة اكس لفل 6 + ماكلارين + كونكر
-                            </button>
-                            <button class="preset-btn" data-preset="economy">
-                                ⚡ حساب اقتصادي امفور جوكر + صابونة
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Input Section -->
-                    <div class="input-section">
-                        <div class="textarea-wrapper">
-                            <textarea id="listingText" dir="rtl" placeholder="انسخ نَص الإعلان الكامل هنا (مثال: للبيع حساب ببجي مستوى 75، امفور تلجي ماكس، بدلة مومياء بيضاء، وش البنت الأصلي، سيارة ماكلارين... المطلوب 15000 ج.م)..."></textarea>
-                            <div class="textarea-actions">
-                                <button id="pasteBtn" class="icon-action-btn" title="لصق من الحافظة">
-                                    <i class="fa-regular fa-clipboard"></i> لصق
-                                </button>
-                                <button id="clearBtn" class="icon-action-btn danger" title="مسح النص">
-                                    <i class="fa-regular fa-trash-can"></i> مسح
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Asking Price (Optional) & CTA Row -->
-                        <div class="eval-controls-row">
-                            <div class="asking-price-input-group">
-                                <label for="askingPriceInput">
-                                    <i class="fa-solid fa-tag color-cyan"></i> السعر المطلوب (اختياري مقارنته بالتقييم):
-                                </label>
-                                <div class="price-field-wrapper">
-                                    <input type="number" id="askingPriceInput" placeholder="مثال: 12000" min="0" step="100">
-                                    <span class="currency-label">ج.م (EGP)</span>
-                                </div>
-                            </div>
-
-                            <button id="evaluateBtn" class="glow-button primary-cta">
-                                <span class="btn-text">
-                                    <i class="fa-solid fa-brain"></i> فحص وتقييم الحساب الآن
-                                </span>
-                                <div class="btn-loader hidden">
-                                    <span class="spinner"></span>
-                                    <span class="loader-step-text">جاري تحليل النص والتسعير...</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Pipeline Steps Animation Container -->
-                    <div id="pipelineProgress" class="pipeline-progress hidden">
-                        <div class="pipeline-step step-done"><i class="fa-solid fa-check-circle"></i> تنظيف ونقل النص (Cleaner)</div>
-                        <div class="pipeline-step step-active"><i class="fa-solid fa-spinner fa-spin"></i> استخراج الأسلحة والميثك والروابط (Regex Parser)</div>
-                        <div class="pipeline-step"><i class="fa-solid fa-circle"></i> تسعير بالنماذج المجمعة (Ensemble Predictor)</div>
-                        <div class="pipeline-step"><i class="fa-solid fa-circle"></i> إعداد تقرير الأمان والأمانة (Security Audit)</div>
-                    </div>
-
-                    <!-- Evaluation Results Output Container -->
-                    <div id="resultsContainer" class="results-container hidden">
-                        <!-- Injected via JavaScript -->
-                    </div>
-                </div>
-            </section>
-
-
-            <!-- ========================================== -->
-            <!-- TAB 2: MARKET INTELLIGENCE                 -->
-            <!-- ========================================== -->
-            <section id="marketTab" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>
-                            <i class="fa-solid fa-chart-line color-cyan"></i>
-                            نشرة مؤشرات وسوق ببجي موبايل (Market Analytics)
-                        </h2>
-                        <button id="refreshMarketBtn" class="icon-action-btn">
-                            <i class="fa-solid fa-arrows-rotate"></i> تحديث البيانات
-                        </button>
-                    </div>
-
-                    <div id="marketSummaryGrid" class="market-summary-grid">
-                        <div class="summary-card">
-                            <div class="summary-icon icon-cyan"><i class="fa-solid fa-list-check"></i></div>
-                            <div class="summary-info">
-                                <span class="summary-label">إجمالي الحسابات المفحوصة</span>
-                                <h3 id="statTotalListings" class="summary-value">--</h3>
-                                <span class="summary-sub">في قاعدة البيانات الحية</span>
-                            </div>
-                        </div>
-
-                        <div class="summary-card">
-                            <div class="summary-icon icon-emerald"><i class="fa-solid fa-tags"></i></div>
-                            <div class="summary-info">
-                                <span class="summary-label">نسبة الحسابات ذات أسعار صريحة</span>
-                                <h3 id="statPricedRate" class="summary-value">--</h3>
-                                <span id="statPricedSub" class="summary-sub">--</span>
-                            </div>
-                        </div>
-
-                        <div class="summary-card">
-                            <div class="summary-icon icon-amber"><i class="fa-solid fa-scale-balanced"></i></div>
-                            <div class="summary-info">
-                                <span class="summary-label">وسيط سعر الحساب (Median Price)</span>
-                                <h3 id="statMedianPrice" class="summary-value">--</h3>
-                                <span class="summary-sub">سعر الحساب المتوسط بالسوق</span>
-                            </div>
-                        </div>
-
-                        <div class="summary-card">
-                            <div class="summary-icon icon-purple"><i class="fa-brands fa-telegram"></i></div>
-                            <div class="summary-info">
-                                <span class="summary-label">المتاجر والقنوات المراقبة</span>
-                                <h3 id="statChannelsCount" class="summary-value">--</h3>
-                                <span class="summary-sub">قنوات تليجرام نشطة</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Charts Grid -->
-                    <div class="charts-grid margin-top-2">
-                        <!-- Chart 1: Price Segments Distribution -->
-                        <div class="chart-card">
-                            <div class="chart-header">
-                                <h3><i class="fa-solid fa-chart-column color-blue"></i> توزيع شرائح الأسعار في السوق</h3>
-                                <span class="badge">EGP Range</span>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="priceDistributionChart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Chart 2: M4 Skin Type Distribution -->
-                        <div class="chart-card">
-                            <div class="chart-header">
-                                <h3><i class="fa-solid fa-pie-chart color-amber"></i> انتشار أنواع أسلحة الـ M416 التطوير</h3>
-                                <span class="badge">M4 Skins</span>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="m4DistributionChart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Chart 3: Item Frequency -->
-                        <div class="chart-card chart-full">
-                            <div class="chart-header">
-                                <h3><i class="fa-solid fa-fire-flame-curved color-rose"></i> نسبة ظهور وانتقاء العناصر النادرة بالحسابات</h3>
-                                <span class="badge">Market Frequency %</span>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="itemFrequencyChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Price Impact Leaderboard -->
-                    <div class="margin-top-2">
-                        <div class="card-header">
-                            <h3><i class="fa-solid fa-gem color-emerald"></i> أعلى العناصر تأثيراً ورفعاً لسعر الحساب (Price Impact Leaderboard)</h3>
-                        </div>
-                        <div id="priceImpactTableContainer" class="table-responsive">
-                            <!-- Injected via JS -->
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-
-            <!-- ========================================== -->
-            <!-- TAB 5: ITEM PRICE EXCHANGE (Phase 2/4)     -->
-            <!-- ========================================== -->
-            <section id="itemIndexTab" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>
-                            <i class="fa-solid fa-chart-line color-cyan"></i>
-                            بورصة العناصر — القيمة الشهرية لكل عنصر نادر (Hedonic Item Index)
-                        </h2>
-                        <button id="refreshItemIndexBtn" class="icon-action-btn">
-                            <i class="fa-solid fa-arrows-rotate"></i> تحديث
-                        </button>
-                    </div>
-
-                    <p class="section-desc">
-                        القيمة الإضافية التقديرية (EGP) لكل عنصر مقارنة بحساب مشابه بدونه، محسوبة شهرياً بانحدار هيدوني على آلاف الإعلانات. اضغط أي عنصر لعرض منحناه الزمني.
-                    </p>
-
-                    <div id="itemIndexTrendCards" class="market-summary-grid margin-top-1">
-                        <!-- Injected via JS: rising/falling/stable counters -->
-                    </div>
-
-                    <div class="charts-grid margin-top-2">
-                        <div class="chart-card chart-full">
-                            <div class="chart-header">
-                                <h3><i class="fa-solid fa-wave-square color-emerald"></i> المنحنى الزمني للعنصر</h3>
-                                <select id="itemIndexSelect" class="item-select"></select>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="itemIndexChart"></canvas>
-                            </div>
-                            <div id="itemIndexMeta" class="margin-top-1 section-desc"><!-- JS --></div>
-                        </div>
-                    </div>
-
-                    <div class="margin-top-2">
-                        <div class="card-header">
-                            <h3><i class="fa-solid fa-ranking-star color-amber"></i> لوحة صدارة العناصر (القيمة الحالية)</h3>
-                        </div>
-                        <div id="itemIndexTableContainer" class="table-responsive"><!-- JS --></div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ========================================== -->
-            <!-- TAB 6: LIVE DEALS + TRUST (Phase 4)        -->
-            <!-- ========================================== -->
-            <section id="dealsTab" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>
-                            <i class="fa-solid fa-crosshairs color-rose"></i>
-                            الصيد الحي وتصنيف ثقة القنوات
-                        </h2>
-                        <span id="liveFeedStatus" class="badge badge-purple">
-                            <i class="fa-solid fa-plug-circle-xmark"></i> غير متصل
-                        </span>
-                    </div>
-
-                    <div class="card-header margin-top-1">
-                        <h3><i class="fa-solid fa-satellite-dish color-cyan"></i> تدفق الصيد الحي (Live Deals)</h3>
-                    </div>
-                    <div id="liveDealsFeed" class="live-deals-feed">
-                        <div class="feed-empty">في انتظار أول صفقة... 🎯</div>
-                    </div>
-
-                    <div class="card-header margin-top-2">
-                        <h3><i class="fa-solid fa-repeat color-purple"></i> تحليل إعادة النشر (Repost Analytics)</h3>
-                    </div>
-                    <div id="repostSummaryGrid" class="market-summary-grid margin-top-1">
-                        <!-- Injected via JS -->
-                    </div>
-                    <div id="topRepostsTableContainer" class="table-responsive margin-top-1"><!-- JS --></div>
-
-                    <div class="card-header margin-top-2">
-                        <h3><i class="fa-solid fa-shield-halved color-emerald"></i> تصنيف ثقة القنوات (Channel Trust)</h3>
-                    </div>
-                    <div id="trustTableContainer" class="table-responsive margin-top-1"><!-- JS --></div>
-                </div>
-            </section>
-
-
-            <!-- ========================================== -->
-            <!-- TAB 3: RARITY & DEMAND HEATMAP             -->
-            <!-- ========================================== -->
-            <section id="heatmapTab" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>
-                            <i class="fa-solid fa-fire color-rose"></i>
-                            مصفوفة ندرة العناصر وشدة الطلب (Rarity × Demand Matrix)
-                        </h2>
-                        <div class="filter-pills">
-                            <button class="filter-pill active" data-filter="ALL">الكل</button>
-                            <button class="filter-pill" data-filter="HOT">🔥 الأكثر طلباً (HOT)</button>
-                            <button class="filter-pill" data-filter="WARM">⚡ مطلوب جداً (WARM)</button>
-                            <button class="filter-pill" data-filter="COOL">❄️ متوفر طبيعي (COOL)</button>
-                        </div>
-                    </div>
-
-                    <p class="section-desc">
-                        تحليل تقاطعي يحسب مدى ندرة كل عنصر (مقلوب تكراره بالسوق) مقابل القيمة المالية المضافة لسعر الحساب عند وجوده.
-                    </p>
-
-                    <div id="heatmapGrid" class="heatmap-cards-grid margin-top-1">
-                        <!-- Injected via JS -->
-                    </div>
-                </div>
-            </section>
-
-
-            <!-- ========================================== -->
-            <!-- TAB 4: MLOPS & DRIFT CENTER                -->
-            <!-- ========================================== -->
-            <section id="mlopsTab" class="tab-content">
-                <div class="glass-card">
-                    <div class="card-header">
-                        <h2>
-                            <i class="fa-solid fa-microchip color-purple"></i>
-                            مراقبة الأداء وانحراف البيانات (MLOps Telemetry & Feature Drift)
-                        </h2>
-                        <button id="triggerRetrainBtnHeader" class="glow-button secondary-btn">
-                            <i class="fa-solid fa-rotate"></i> إطلاق إعادة التدريب (Retrain)
-                        </button>
-                    </div>
-
-                    <div id="mlopsGrid" class="mlops-telemetry-grid margin-top-1">
-                        <!-- Injected via JS -->
-                    </div>
-
-                    <div class="ensemble-info-box margin-top-2">
-                        <h3><i class="fa-solid fa-network-wired color-cyan"></i> هيكلية نموذج التقييم المجمع (Ensemble Pricing Architecture)</h3>
-                        <div class="architecture-row margin-top-1">
-                            <div class="arch-card">
-                                <div class="arch-icon"><i class="fa-solid fa-tree color-emerald"></i></div>
-                                <h4>XGBoost Regressor</h4>
-                                <span class="arch-weight">الوزن: 40%</span>
-                                <p>متخصص في علاقات التفاعل غير الخطية بين المستويات والـ Mythics.</p>
-                            </div>
-                            <div class="arch-card">
-                                <div class="arch-icon"><i class="fa-solid fa-cat color-amber"></i></div>
-                                <h4>CatBoost Regressor</h4>
-                                <span class="arch-weight">الوزن: 35%</span>
-                                <p>متخصص في الفئات النادرة وتنوع المركبات والأسلحة.</p>
-                            </div>
-                            <div class="arch-card">
-                                <div class="arch-icon"><i class="fa-solid fa-bolt color-blue"></i></div>
-                                <h4>LightGBM Regressor</h4>
-                                <span class="arch-weight">الوزن: 25%</span>
-                                <p>معالجة سريعة ودقيقة للتباين وتوقع النطاق السعري P10-P90.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </main>
-
-        <!-- Footer -->
-        <footer class="main-footer">
-            <p>PUBG Mobile AI Market Intelligence Platform &copy; 2026 | تطوير الهندسة الواجهية وتطبيقات الذكاء الاصطناعي</p>
-        </footer>
+    <!-- ── Stale data warning ──────────────────────────────────── -->
+    <div id="dataStaleBanner" class="stale-banner hidden">
+        <i data-lucide="triangle-alert"></i>
+        <div>
+            <b>البيانات قديمة.</b>
+            <span id="staleBannerText">آخر إعلان تم تحليله غير حديث — الأرقام تقديرية حتى وصول تحديث من القنوات.</span>
+        </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="/static/app.js"></script>
+    <main class="main">
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- TAB 1 — ACCOUNT EVALUATOR                             -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <section id="evaluatorTab" class="tab-content active">
+
+            <div class="hero">
+                <span class="eyebrow"><i data-lucide="sparkles"></i> تسعير من إعلانات تليجرام حقيقية</span>
+                <h1>اعرف السعر العادل للحساب قبل ما تشتري</h1>
+                <p>الصق نص الإعلان، وخلال ثوانٍ تحصل على سعر عادل، نطاق متوقع، وتقرير أمان للروابط والحساب.</p>
+                <div class="hero-meta">
+                    <span class="meta-item"><i data-lucide="database"></i> <b id="sysListings">—</b> إعلان محلل</span>
+                    <span class="meta-sep"></span>
+                    <span class="meta-item"><i data-lucide="send"></i> <b id="sysChannels">—</b> قناة مراقبة</span>
+                    <span class="meta-sep"></span>
+                    <span class="meta-item" id="sysEngine"><i data-lucide="activity"></i> محرك التقييم جاهز</span>
+                </div>
+            </div>
+
+            <div class="panel eval-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>تقييم حساب</h2>
+                        <p class="panel-sub">الصق الإعلان ← اكتب السعر المطلوب (اختياري) ← احسب.</p>
+                    </div>
+                    <span class="badge badge-brand"><i data-lucide="scan-text"></i> محلل عربي</span>
+                </div>
+
+                <div class="preset-row">
+                    <span class="preset-label">جرّب نموذجًا</span>
+                    <button class="chip preset-btn" data-preset="glacier">
+                        <i data-lucide="snowflake"></i> امفور تلجي MAX
+                    </button>
+                    <button class="chip preset-btn" data-preset="xsuit">
+                        <i data-lucide="crown"></i> اكس لفل 6 + ماكلارين
+                    </button>
+                    <button class="chip preset-btn" data-preset="economy">
+                        <i data-lucide="wallet"></i> حساب اقتصادي
+                    </button>
+                </div>
+
+                <div class="field">
+                    <label class="field-label" for="listingText">نص الإعلان</label>
+                    <div class="textarea-wrap">
+                        <textarea id="listingText" placeholder="مثال: للبيع حساب ببجي لفل 77 — إمفور تلجي ماكس، مومياء كاملة، ماكلارين ميثك، الربط متاح — السعر 18,500"></textarea>
+                        <div class="textarea-tools">
+                            <button id="pasteBtn" type="button" class="btn btn-ghost btn-xs">
+                                <i data-lucide="clipboard-paste"></i> لصق
+                            </button>
+                            <button id="clearBtn" type="button" class="btn btn-ghost btn-xs">
+                                <i data-lucide="trash-2"></i> مسح
+                            </button>
+                        </div>
+                    </div>
+                    <p class="field-hint"><i data-lucide="info"></i> كل ما كان الإعلان أوضح (المستوى، الميثك، الربط)، كان التقييم أدق.</p>
+                </div>
+
+                <div class="eval-actions">
+                    <div class="price-field">
+                        <label class="field-label" for="askingPriceInput">السعر المطلوب من البائع</label>
+                        <div class="input-affix">
+                            <input type="number" id="askingPriceInput" placeholder="0" min="0" step="100" inputmode="numeric">
+                            <span class="affix">ج.م</span>
+                        </div>
+                    </div>
+
+                    <button id="evaluateBtn" type="button" class="btn btn-primary btn-lg">
+                        <span class="btn-text"><i data-lucide="calculator"></i> احسب السعر العادل</span>
+                        <span class="btn-loader hidden"><span class="spinner"></span> جاري التحليل…</span>
+                    </button>
+                </div>
+
+                <div id="pipelineProgress" class="progress hidden">
+                    <span class="progress-step is-done"><i data-lucide="check"></i> تنظيف النص</span>
+                    <span class="progress-step is-active"><i data-lucide="loader-circle"></i> استخراج العناصر</span>
+                    <span class="progress-step"><i data-lucide="circle"></i> تسعير النماذج</span>
+                    <span class="progress-step"><i data-lucide="circle"></i> تقرير الأمان</span>
+                </div>
+
+                <div id="resultsContainer" class="results hidden"></div>
+
+                <div id="evalPlaceholder" class="placeholder">
+                    <div class="placeholder-head">
+                        <i data-lucide="layout-dashboard"></i>
+                        <span>هذا ما سيظهر بعد التحليل</span>
+                    </div>
+                    <div class="placeholder-grid">
+                        <div class="placeholder-card">
+                            <span class="ph-k">السعر العادل</span>
+                            <span class="ph-v">—</span>
+                            <span class="ph-s">مقارنة بسعر البائع</span>
+                        </div>
+                        <div class="placeholder-card">
+                            <span class="ph-k">النطاق المتوقع</span>
+                            <span class="ph-v">—</span>
+                            <span class="ph-s">P10 – P90</span>
+                        </div>
+                        <div class="placeholder-card">
+                            <span class="ph-k">أمان الحساب</span>
+                            <span class="ph-v">—</span>
+                            <span class="ph-s">الروابط والمخاطر</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-strip">
+                <div class="info-item">
+                    <span class="info-k"><i data-lucide="database"></i> البيانات</span>
+                    <p>إعلانات منشورة علنًا في قنوات تليجرام متخصصة، مع إعادة حساب دورية للأسعار.</p>
+                </div>
+                <div class="info-item">
+                    <span class="info-k"><i data-lucide="layers"></i> الطريقة</span>
+                    <p>نموذج مجمّع (XGBoost + CatBoost + LightGBM) مع مقارنة بأقرب الحسابات المشابهة.</p>
+                </div>
+                <div class="info-item">
+                    <span class="info-k"><i data-lucide="shield-alert"></i> الحدود</span>
+                    <p>التقييم تقديري وليس ضمان سعر. راجع تقرير الأمان والروابط قبل أي صفقة.</p>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- TAB 2 — MARKET OVERVIEW                               -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <section id="marketTab" class="tab-content">
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>مؤشرات السوق</h2>
+                        <p class="panel-sub">صورة سريعة عن أحجام السوق وتوزيع الأسعار والعناصر.</p>
+                    </div>
+                    <button id="refreshMarketBtn" type="button" class="btn btn-ghost btn-sm">
+                        <i data-lucide="refresh-cw"></i> تحديث
+                    </button>
+                </div>
+
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <span class="stat-k">إجمالي الإعلانات</span>
+                        <span id="statTotalListings" class="stat-v">—</span>
+                        <span class="stat-s">في قاعدة البيانات الحية</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-k">نسبة الأسعار الصريحة</span>
+                        <span id="statPricedRate" class="stat-v">—</span>
+                        <span id="statPricedSub" class="stat-s">—</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-k">وسيط السعر</span>
+                        <span id="statMedianPrice" class="stat-v">—</span>
+                        <span class="stat-s">Median price</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-k">القنوات المراقبة</span>
+                        <span id="statChannelsCount" class="stat-v">—</span>
+                        <span class="stat-s">قنوات تليجرام نشطة</span>
+                    </div>
+                </div>
+
+                <div class="chart-grid">
+                    <div class="card">
+                        <div class="card-head">
+                            <h3><i data-lucide="chart-column"></i> توزيع شرائح الأسعار</h3>
+                            <span class="badge">EGP</span>
+                        </div>
+                        <div class="chart-box"><canvas id="priceDistributionChart"></canvas></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-head">
+                            <h3><i data-lucide="chart-pie"></i> أنواع M416 التطوير</h3>
+                            <span class="badge">M4 Skins</span>
+                        </div>
+                        <div class="chart-box"><canvas id="m4DistributionChart"></canvas></div>
+                    </div>
+
+                    <div class="card card-wide">
+                        <div class="card-head">
+                            <h3><i data-lucide="flame"></i> نسبة ظهور العناصر النادرة</h3>
+                            <span class="badge">Frequency %</span>
+                        </div>
+                        <div class="chart-box chart-box-tall"><canvas id="itemFrequencyChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-head">
+                        <h3><i data-lucide="gem"></i> أعلى العناصر تأثيرًا على السعر</h3>
+                        <p class="panel-sub">الفرق بين وسيط سعر الحساب مع العنصر وبدونه.</p>
+                    </div>
+                    <div id="priceImpactTableContainer" class="table-wrap"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- TAB 3 — ITEM PRICE INDEX                              -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <section id="itemIndexTab" class="tab-content">
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>بورصة العناصر</h2>
+                        <p class="panel-sub">القيمة المضافة لكل عنصر نادر شهريًا، محسوبة بانحدار هيدوني على آلاف الإعلانات.</p>
+                    </div>
+                    <button id="refreshItemIndexBtn" type="button" class="btn btn-ghost btn-sm">
+                        <i data-lucide="refresh-cw"></i> تحديث
+                    </button>
+                </div>
+
+                <div id="itemIndexTrendCards" class="stat-grid stat-grid-3"></div>
+
+                <div class="card card-wide">
+                    <div class="card-head">
+                        <h3><i data-lucide="chart-line"></i> المنحنى الزمني للعنصر</h3>
+                        <select id="itemIndexSelect" class="select" aria-label="اختيار العنصر"></select>
+                    </div>
+                    <div class="chart-box chart-box-tall"><canvas id="itemIndexChart"></canvas></div>
+                    <p id="itemIndexMeta" class="meta-line"></p>
+                </div>
+
+                <div class="section">
+                    <div class="section-head">
+                        <h3><i data-lucide="trophy"></i> لوحة الصدارة — القيمة الحالية</h3>
+                    </div>
+                    <div id="itemIndexTableContainer" class="table-wrap"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- TAB 4 — DEALS + TRUST                                 -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <section id="dealsTab" class="tab-content">
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>الصفقات والثقة</h2>
+                        <p class="panel-sub">صيد حي للصفقات، تحليل إعادة النشر، وتصنيف ثقة القنوات.</p>
+                    </div>
+                    <span id="liveFeedStatus" class="badge badge-muted">
+                        <i data-lucide="wifi-off"></i> غير متصل
+                    </span>
+                </div>
+
+                <div class="section-head">
+                    <h3><i data-lucide="radio"></i> تدفق الصيد الحي</h3>
+                </div>
+                <div id="liveDealsFeed" class="feed">
+                    <div class="feed-empty">في انتظار أول صفقة…</div>
+                </div>
+
+                <div class="section">
+                    <div class="section-head">
+                        <h3><i data-lucide="repeat"></i> تحليل إعادة النشر</h3>
+                    </div>
+                    <div id="repostSummaryGrid" class="stat-grid"></div>
+                    <div id="topRepostsTableContainer" class="table-wrap"></div>
+                </div>
+
+                <div class="section">
+                    <div class="section-head">
+                        <h3><i data-lucide="shield-check"></i> تصنيف ثقة القنوات</h3>
+                        <p class="panel-sub">مؤشرات السبام، الوسيط، الربط الداخلي، وتكرار إعادة النشر.</p>
+                    </div>
+                    <div id="trustTableContainer" class="table-wrap"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- TAB 5 — RARITY & DEMAND                               -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <section id="heatmapTab" class="tab-content">
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>الطلب والندرة</h2>
+                        <p class="panel-sub">كل عنصر: كم هو نادر في السوق، وكم يزيد من قيمة الحساب.</p>
+                    </div>
+                    <div class="pills" role="group" aria-label="تصفية حسب الإشارة">
+                        <button class="pill filter-pill active" data-filter="ALL">الكل</button>
+                        <button class="pill filter-pill" data-filter="HOT">HOT — أعلى طلب</button>
+                        <button class="pill filter-pill" data-filter="WARM">WARM — مطلوب</button>
+                        <button class="pill filter-pill" data-filter="COOL">COOL — متوفر</button>
+                    </div>
+                </div>
+
+                <div id="heatmapGrid" class="heatmap-grid"></div>
+            </div>
+        </section>
+
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- TAB 6 — SYSTEM HEALTH / MLOPS                          -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <section id="mlopsTab" class="tab-content">
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>حالة النظام</h2>
+                        <p class="panel-sub">جودة النموذج، انحراف البيانات، وحالة التحديث.</p>
+                    </div>
+                    <button id="triggerRetrainBtnHeader" type="button" class="btn btn-ghost btn-sm">
+                        <i data-lucide="rotate-cw"></i> إعادة التدريب
+                    </button>
+                </div>
+
+                <div id="mlopsGrid" class="stat-grid"></div>
+
+                <div class="card card-wide">
+                    <div class="card-head">
+                        <h3><i data-lucide="network"></i> هيكل نموذج التقييم المجمّع</h3>
+                    </div>
+                    <div class="arch-grid">
+                        <div class="arch-card">
+                            <span class="arch-icon"><i data-lucide="git-branch"></i></span>
+                            <h4>XGBoost</h4>
+                            <span class="arch-weight">وزن 40%</span>
+                            <p>علاقات التفاعل غير الخطية بين المستويات وعناصر الميثك.</p>
+                        </div>
+                        <div class="arch-card">
+                            <span class="arch-icon"><i data-lucide="boxes"></i></span>
+                            <h4>CatBoost</h4>
+                            <span class="arch-weight">وزن 35%</span>
+                            <p>الفئات النادرة وتنوع المركبات والأسلحة.</p>
+                        </div>
+                        <div class="arch-card">
+                            <span class="arch-icon"><i data-lucide="zap"></i></span>
+                            <h4>LightGBM</h4>
+                            <span class="arch-weight">وزن 25%</span>
+                            <p>التباين وتوقع النطاق السعري P10–P90.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <span>PUBG Oracle © 2026</span>
+        <span>تقديرات إحصائية من إعلانات عامة — ليست عرضًا ملزمًا.</span>
+    </footer>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="/static/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة حسابي — PUBG Oracle</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dash.css">
+</head>
+<body>
+<div class="app">
+
+    <header class="dash-top">
+        <div class="dash-top-inner">
+            <a class="brand" href="/" aria-label="PUBG Oracle">
+                <span class="brand-mark"><i data-lucide="crosshair"></i></span>
+                <span class="brand-text">
+                    <span class="brand-name">PUBG <b>Oracle</b></span>
+                    <span class="brand-sub">لوحة حسابي</span>
+                </span>
+            </a>
+            <div class="dash-top-actions">
+                <span class="dash-kicker"><i data-lucide="user"></i> مساحة المشترك</span>
+                <a class="btn btn-ghost btn-sm" href="/">
+                    <i data-lucide="arrow-left"></i> المنصة
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="dash-main">
+
+        <!-- ── Gate: not opened from Telegram ─────────────────────────── -->
+        <section id="userGate" class="login-wrap hidden">
+            <div class="login-card">
+                <span class="brand-mark"><i data-lucide="lock"></i></span>
+                <h1>افتح اللوحة من داخل البوت</h1>
+                <p>لوحة حسابك تعرض خطتك واستخدامك ومدفوعاتك، لذلك نتحقق من هويتك عبر تليجرام.</p>
+                <ol class="login-steps">
+                    <li>افتح بوت <b>PUBG Oracle</b> على تليجرام.</li>
+                    <li>اضغط زر «لوحة حسابي» أو أرسل <code>/me</code>.</li>
+                    <li>ستُفتح هذه الصفحة تلقائيًا مع بياناتك.</li>
+                </ol>
+                <a id="botLink" class="btn btn-primary hidden" target="_blank" rel="noopener">
+                    <i data-lucide="send"></i> فتح البوت
+                </a>
+                <div class="login-note">
+                    لا يعمل الرابط؟ تأكد أن الصفحة تُفتح من داخل تليجرام، لا من متصفح خارجي.
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Dashboard ──────────────────────────────────────────────── -->
+        <section id="userApp" class="hidden">
+
+            <div class="view-head">
+                <div class="profile">
+                    <span class="avatar" id="uAvatar">—</span>
+                    <div>
+                        <div class="profile-name" id="uName">—</div>
+                        <div class="profile-sub" id="uHandle">—</div>
+                    </div>
+                </div>
+                <div class="dash-top-actions">
+                    <span id="uPlanBadge" class="badge">—</span>
+                    <button id="refreshMe" type="button" class="btn btn-ghost btn-sm">
+                        <i data-lucide="refresh-cw"></i> تحديث
+                    </button>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi is-brand">
+                    <span class="kpi-k">الخطة الحالية</span>
+                    <span class="kpi-v is-text" id="uPlan">—</span>
+                    <span class="kpi-s" id="uPlanSub">—</span>
+                </div>
+                <div class="kpi">
+                    <span class="kpi-k">استعلامات آخر 24 ساعة</span>
+                    <span class="kpi-v" id="uUsage">—</span>
+                    <span class="kpi-s" id="uUsageSub">—</span>
+                </div>
+                <div class="kpi">
+                    <span class="kpi-k">رصيد الاستعلامات</span>
+                    <span class="kpi-v" id="uCredits">—</span>
+                    <span class="kpi-s">استعلام إضافي عند نفاد المجاني</span>
+                </div>
+                <div class="kpi">
+                    <span class="kpi-k">عضو منذ</span>
+                    <span class="kpi-v is-text" id="uSince">—</span>
+                    <span class="kpi-s" id="uRef">—</span>
+                </div>
+            </div>
+
+            <div class="dash-grid-2">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2>الاستخدام</h2>
+                            <p class="panel-sub">الحد المجاني 3 استعلامات كل 24 ساعة. Pro و Business بلا حدود.</p>
+                        </div>
+                    </div>
+                    <div style="margin-top:14px">
+                        <div class="usage-line">
+                            <span>المستخدم من الحد</span>
+                            <b id="usageNumber">—</b>
+                        </div>
+                        <div class="usage-track">
+                            <div class="usage-fill" id="usageFill" style="width:0%"></div>
+                        </div>
+                        <div id="usageHint" class="hint-row">
+                            <i data-lucide="info"></i>
+                            <span>—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2>السوق والعملة</h2>
+                            <p class="panel-sub">الأسعار تُعرض بعملة سوقك.</p>
+                        </div>
+                    </div>
+                    <div class="field" style="margin-top:14px">
+                        <label class="field-label" for="countrySelect">الدولة</label>
+                        <select id="countrySelect" class="select" style="max-width:none;width:100%">
+                            <option value="EG">مصر — EGP</option>
+                            <option value="SA">السعودية — SAR</option>
+                            <option value="AE">الإمارات — AED</option>
+                        </select>
+                    </div>
+                    <div class="hint-row">
+                        <i data-lucide="wallet"></i>
+                        <span>الدفع عبر فودافون كاش أو إنستاباي (مصر)، ويُفعّل الاشتراك بعد مراجعة الإثبات.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>سجل المدفوعات</h2>
+                        <p class="panel-sub">آخر 20 عملية. المدفوعات المعلّقة تُراجع يدويًا.</p>
+                    </div>
+                </div>
+                <div id="paymentsTable" class="table-wrap"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>الخطط والأسعار</h2>
+                        <p class="panel-sub">للشراء أرسل أمر الدفع إلى البوت.</p>
+                    </div>
+                </div>
+                <div id="offersGrid" class="offer-grid" style="margin-top:14px"></div>
+            </div>
+
+        </section>
+    </main>
+
+    <footer class="footer">
+        <span>PUBG Oracle © 2026</span>
+        <span>لوحة المشترك — البيانات محفوظة في قاعدة المنصة.</span>
+    </footer>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="/static/shared.js"></script>
+<script src="/static/user.js"></script>
+</body>
+</html>

@@ -11,7 +11,7 @@ import csv
 import json
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 # استيراد الوحدات الخاصة بنا
 import config
@@ -95,6 +95,34 @@ def export_backup_files(channel_file_name: str, display_name: str):
     except Exception as e:
         logger.error(f"خطأ أثناء تصدير النسخ الاحتياطية للقناة {display_name}: {str(e)}")
 
+async def run_scrape_cycle(scraper, channel_list, from_date, to_date, logger) -> int:
+    """One pass over all configured channels. Returns new message count."""
+    total_new_messages = 0
+    for channel_info in channel_list:
+        logger.info("=" * 60)
+        logger.info(f"بدء معالجة القناة: {channel_info['display_name']}")
+
+        new_msgs = await scraper.scrape_channel(channel_info, from_date, to_date)
+        total_new_messages += new_msgs
+
+        # تصدير ملفات النسخ الاحتياطي (CSV و JSON) تلقائياً للقناة فور انتهاء سحبها
+        export_backup_files(channel_info["file_name"], channel_info["display_name"])
+
+    try:
+        from intelligence.freshness import get_freshness
+
+        fresh = get_freshness()
+        logger.info(
+            "حالة حداثة البيانات: %s | آخر إعلان: %s | آخر 24 ساعة: %s | قنوات نشطة: %s",
+            fresh["status"], fresh["last_listing_at"],
+            fresh["listings_24h"], fresh["channels_24h"],
+        )
+    except Exception as fresh_err:
+        logger.warning(f"تعذر قراءة حداثة البيانات: {fresh_err}")
+
+    return total_new_messages
+
+
 async def main_async(args, logger):
     """
     المشغل الرئيسي غير المتزامن لإدارة الاتصال والدورة الحياتية للـ Scraper.
@@ -118,7 +146,7 @@ async def main_async(args, logger):
         channel_list.append(parsed)
         logger.info(f"تجهيز القناة: {parsed['display_name']} ({parsed['type']})")
 
-    # 3. تفكيك تواريخ البدء والنهاية للفلترة
+    # 3. تفكيك تواريخ البدء والنهاية للفلترة (للدورة الأولى)
     try:
         from_date = datetime.fromisoformat(args.from_date).astimezone(UTC)
         to_date = datetime.fromisoformat(args.to_date).astimezone(UTC)
@@ -134,22 +162,39 @@ async def main_async(args, logger):
     try:
         await scraper.start()
 
-        total_new_messages = 0
-        for channel_info in channel_list:
+        if not args.continuous:
+            total_new_messages = await run_scrape_cycle(
+                scraper, channel_list, from_date, to_date, logger
+            )
             logger.info("=" * 60)
-            logger.info(f"بدء معالجة القناة: {channel_info['display_name']}")
+            logger.info("تم الانتهاء من تشغيل النظام بالكامل بنجاح!")
+            logger.info(f"إجمالي الرسائل الجديدة المضافة في هذه الجلسة: {total_new_messages}")
+            return
 
-            # استدعاء دالة سحب بيانات القناة
-            new_msgs = await scraper.scrape_channel(channel_info, from_date, to_date)
-            total_new_messages += new_msgs
+        # الوضع المستمر: دورة كل N دقيقة، مع نافذة lookback لالتقاط التعديلات
+        interval = max(1, int(args.interval_minutes))
+        lookback = max(1, int(args.lookback_days))
+        logger.info(f"الوضع المستمر مفعّل: كل {interval} دقيقة، نافذة {lookback} يوم.")
 
-            # تصدير ملفات النسخ الاحتياطي (CSV و JSON) تلقائياً للقناة فور انتهاء سحبها
-            export_backup_files(channel_info["file_name"], channel_info["display_name"])
+        while True:
+            cycle_to = datetime.now(UTC)
+            cycle_from = cycle_to - timedelta(days=lookback)
+            logger.info(
+                f"--- دورة جديدة {cycle_to.isoformat()} ---"
+            )
+            try:
+                new_msgs = await run_scrape_cycle(
+                    scraper, channel_list, cycle_from, cycle_to, logger
+                )
+                logger.info(f"دورة مكتملة: {new_msgs} رسالة جديدة.")
+            except Exception as cycle_err:
+                logger.error(f"خطأ في الدورة: {cycle_err}", exc_info=True)
 
-        logger.info("=" * 60)
-        logger.info("تم الانتهاء من تشغيل النظام بالكامل بنجاح!")
-        logger.info(f"إجمالي الرسائل الجديدة المضافة في هذه الجلسة: {total_new_messages}")
+            logger.info(f"النوم {interval} دقيقة قبل الدورة التالية...")
+            await asyncio.sleep(interval * 60)
 
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.info("تم إيقاف الوضع المستمر بواسطة المستخدم.")
     except Exception as run_err:
         logger.critical(f"خطأ حرج أدى إلى توقف نظام السحب: {str(run_err)}", exc_info=True)
     finally:
@@ -184,6 +229,23 @@ def main():
         "--skip-images",
         action="store_true",
         help="تنبيه: الكود معد افتراضياً لعدم تحميل أي صور لتوفير المساحة وسرعة السحب."
+    )
+    parser.add_argument(
+        "--continuous",
+        action="store_true",
+        help="تشغيل السحب في وضع مستمر (دورة كل --interval-minutes دقيقة)."
+    )
+    parser.add_argument(
+        "--interval-minutes",
+        type=int,
+        default=30,
+        help="الفاصل الزمني بين الدورات في الوضع المستمر (افتراضي 30 دقيقة)."
+    )
+    parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=3,
+        help="نافذة إعادة الفحص في الوضع المستمر بال أيام (افتراضي 3)."
     )
 
     args = parser.parse_args()

@@ -1,7 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -54,6 +65,11 @@ class ParsedAccount(Base):
     active_combos_str = Column(Text, nullable=True)
     extracted_items_str = Column(Text, nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint("channel_username", "message_id",
+                         name="uq_parsed_channel_message"),
+    )
+
 class MarketStat(Base):
     __tablename__ = "market_stats"
 
@@ -105,3 +121,85 @@ class DealFeedback(Base):
     __table_args__ = (
         UniqueConstraint("chat_id", "message_id", "label", name="uq_feedback_ad_label"),
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# Monetization layer (Week 3): users, subscriptions, payments,
+# usage metering and credit ledger.
+# ─────────────────────────────────────────────────────────────
+
+class User(Base):
+    """A Telegram user of the bot/dashboard."""
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
+    username: Mapped[str | None] = mapped_column(String(255))
+    first_name: Mapped[str | None] = mapped_column(String(255))
+    language: Mapped[str] = mapped_column(String(8), default="ar")
+    country: Mapped[str | None] = mapped_column(String(8))   # EG | SA | AE | ...
+    currency: Mapped[str] = mapped_column(String(8), default="EGP")
+    referred_by: Mapped[str | None] = mapped_column(String(64), index=True)
+    is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Subscription(Base):
+    """A paid (or granted) entitlement period for a user."""
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    plan: Mapped[str] = mapped_column(String(32), nullable=False)       # pro_monthly | pro_annual | business
+    status: Mapped[str] = mapped_column(String(16), default="active")   # active | expired | cancelled
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(32), default="manual")
+    price_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), default="EGP")
+    external_ref: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Payment(Base):
+    """Money in, with manual approval for wallets and Stars reconciliation."""
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), default="EGP")
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    external_ref: Mapped[str | None] = mapped_column(String(128), index=True)
+    proof_note: Mapped[str | None] = mapped_column(Text)
+    offer_code: Mapped[str | None] = mapped_column(String(32), index=True)
+    partner_code: Mapped[str | None] = mapped_column(String(64), index=True)
+    partner_share_amount: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    reviewed_by: Mapped[str | None] = mapped_column(String(64))
+
+
+class UsageEvent(Base):
+    """One row per metered action (check, alert, valuation)."""
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(32), default="check", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    meta: Mapped[str | None] = mapped_column(Text)
+
+
+class CreditLedger(Base):
+    """Append-only credit balance. Balance = SUM(delta)."""
+    __tablename__ = "credit_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    balance_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

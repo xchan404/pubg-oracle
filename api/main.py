@@ -52,6 +52,23 @@ def root():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
 
+@app.get("/dashboard", include_in_schema=False)
+def user_dashboard():
+    """Subscriber dashboard (opened from inside the Telegram bot)."""
+    return FileResponse(os.path.join(static_dir, "user.html"))
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_dashboard():
+    """Owner operations dashboard."""
+    return FileResponse(os.path.join(static_dir, "admin.html"))
+
+
+from api.dashboards import router as dashboards_router  # noqa: E402
+
+app.include_router(dashboards_router)
+
+
 # Load the model
 pricer: EnsemblePricer | None = None
 try:
@@ -346,8 +363,21 @@ if __name__ == "__main__":
 # ─── Health ──────────────────────────────────────────────────
 @app.get("/health")
 def health_check():
-    """Lightweight liveness probe for Docker/monitoring."""
-    return {"status": "ok", "model_loaded": pricer is not None}
+    """Liveness probe: model loaded + data freshness (never raises)."""
+    try:
+        from intelligence.freshness import get_freshness
+        data = get_freshness()
+    except Exception as e:
+        data = {"status": "unknown", "error": str(e)}
+    return {"status": "ok", "model_loaded": pricer is not None, "data": data}
+
+
+@app.get("/health/data")
+def health_data():
+    """Dedicated freshness probe for monitoring/alerting."""
+    from intelligence.freshness import get_freshness
+
+    return get_freshness()
 
 
 # ─── Live Deals Feed (Phase 4) ───────────────────────────────

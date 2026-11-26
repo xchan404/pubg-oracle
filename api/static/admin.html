@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الإدارة — PUBG Oracle</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/dash.css">
+</head>
+<body>
+<div class="app">
+
+    <header class="dash-top">
+        <div class="dash-top-inner">
+            <a class="brand" href="/" aria-label="PUBG Oracle">
+                <span class="brand-mark"><i data-lucide="crosshair"></i></span>
+                <span class="brand-text">
+                    <span class="brand-name">PUBG <b>Oracle</b></span>
+                    <span class="brand-sub">لوحة الإدارة</span>
+                </span>
+            </a>
+            <div class="dash-top-actions">
+                <span class="dash-kicker"><i data-lucide="shield-check"></i> مساحة المشغّل</span>
+                <a class="btn btn-ghost btn-sm" href="/">
+                    <i data-lucide="arrow-left"></i> المنصة
+                </a>
+                <button id="logoutBtn" type="button" class="btn btn-ghost btn-sm hidden">
+                    <i data-lucide="log-out"></i> خروج
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dash-main">
+
+        <!-- ── Login ──────────────────────────────────────────────────── -->
+        <section id="adminLogin" class="login-wrap hidden">
+            <form class="login-card" id="loginForm" autocomplete="off">
+                <span class="brand-mark"><i data-lucide="shield-check"></i></span>
+                <h1>دخول الإدارة</h1>
+                <p>هذه اللوحة للمشغّل فقط: تفعيل المدفوعات، إدارة المستخدمين، ومتابعة الإيراد.</p>
+
+                <div class="field">
+                    <label class="field-label" for="adminToken">توكن الإدارة</label>
+                    <div class="input-affix">
+                        <input type="password" id="adminToken" placeholder="الصق التوكن هنا" autocomplete="current-password">
+                        <span class="affix"><i data-lucide="key-round"></i></span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i data-lucide="log-in"></i> دخول
+                </button>
+
+                <div class="login-note">
+                    التوكن موجود في <code>logs/admin_token.txt</code>، أو عيّنه عبر
+                    <code>ADMIN_DASHBOARD_TOKEN</code>.
+                    لو فتحت الصفحة من تليجرام بحساب المالك (<code>MY_CHAT_ID</code>)، الدخول يتم تلقائيًا.
+                </div>
+            </form>
+        </section>
+
+        <!-- ── App ────────────────────────────────────────────────────── -->
+        <section id="adminApp" class="hidden">
+            <div class="dash-layout">
+                <aside class="dash-side" aria-label="أقسام الإدارة">
+                    <button class="side-btn active" data-view="overview">
+                        <i data-lucide="layout-dashboard"></i> نظرة عامة
+                    </button>
+                    <button class="side-btn" data-view="payments">
+                        <i data-lucide="wallet"></i> المدفوعات
+                        <span id="pendingCount" class="side-count hidden">0</span>
+                    </button>
+                    <button class="side-btn" data-view="users">
+                        <i data-lucide="users"></i> المستخدمون
+                    </button>
+                    <button class="side-btn" data-view="partners">
+                        <i data-lucide="handshake"></i> الشركاء
+                    </button>
+                    <div class="side-sep"></div>
+                    <button class="side-btn" data-view="data">
+                        <i data-lucide="activity"></i> البيانات والنظام
+                    </button>
+                </aside>
+
+                <div class="dash-content">
+
+                    <!-- Overview -->
+                    <section id="view-overview" class="view active">
+                        <div class="view-head">
+                            <div>
+                                <h1>نظرة عامة</h1>
+                                <p>الإيراد، الاشتراكات، المدفوعات المعلّقة، وحالة البيانات.</p>
+                            </div>
+                            <button id="refreshOverview" type="button" class="btn btn-ghost btn-sm">
+                                <i data-lucide="refresh-cw"></i> تحديث
+                            </button>
+                        </div>
+
+                        <div id="freshnessNote" class="inline-note" style="margin-bottom:14px">
+                            <i data-lucide="database"></i><span>جارٍ فحص البيانات…</span>
+                        </div>
+
+                        <div id="overviewKpis" class="kpi-grid kpi-grid-3"></div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div><h2>آخر المدفوعات</h2><p class="panel-sub">أحدث 6 عمليات بغض النظر عن الحالة.</p></div>
+                            </div>
+                            <div id="recentPayments" class="table-wrap"></div>
+                        </div>
+
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div><h2>الشركاء</h2><p class="panel-sub">حصة 25% تُحسب عند اعتماد الدفعة.</p></div>
+                            </div>
+                            <div id="partnerMini" class="table-wrap"></div>
+                        </div>
+                    </section>
+
+                    <!-- Payments -->
+                    <section id="view-payments" class="view">
+                        <div class="view-head">
+                            <div>
+                                <h1>المدفوعات</h1>
+                                <p>اعتمد الدفعة لتفعيل الاشتراك أو الرصيد، أو ارفضها مع سبب.</p>
+                            </div>
+                            <button id="refreshPayments" type="button" class="btn btn-ghost btn-sm">
+                                <i data-lucide="refresh-cw"></i> تحديث
+                            </button>
+                        </div>
+
+                        <div class="toolbar">
+                            <div class="seg" id="paymentFilter">
+                                <button type="button" data-status="pending" class="active">قيد المراجعة</button>
+                                <button type="button" data-status="approved">مقبولة</button>
+                                <button type="button" data-status="rejected">مرفوضة</button>
+                                <button type="button" data-status="all">الكل</button>
+                            </div>
+                        </div>
+
+                        <div id="paymentsBody" class="table-wrap"></div>
+                    </section>
+
+                    <!-- Users -->
+                    <section id="view-users" class="view">
+                        <div class="view-head">
+                            <div>
+                                <h1>المستخدمون</h1>
+                                <p>بحث بالاسم أو المعرف، منح خطط، تعديل الرصيد، أو حظر.</p>
+                            </div>
+                            <button id="refreshUsers" type="button" class="btn btn-ghost btn-sm">
+                                <i data-lucide="refresh-cw"></i> تحديث
+                            </button>
+                        </div>
+
+                        <div class="toolbar">
+                            <label class="search">
+                                <i data-lucide="search"></i>
+                                <input id="userSearch" type="search" placeholder="اسم، يوزرنيم، أو Telegram ID">
+                            </label>
+                            <button id="userSearchBtn" type="button" class="btn btn-ghost btn-sm">بحث</button>
+                            <span id="usersTotal" class="muted-note"></span>
+                        </div>
+
+                        <div id="usersBody" class="table-wrap"></div>
+                    </section>
+
+                    <!-- Partners -->
+                    <section id="view-partners" class="view">
+                        <div class="view-head">
+                            <div>
+                                <h1>الشركاء</h1>
+                                <p>إجمالي المبيعات وحصة الشريك لكل كود، من الدفعات المعتمدة فقط.</p>
+                            </div>
+                            <button id="refreshPartners" type="button" class="btn btn-ghost btn-sm">
+                                <i data-lucide="refresh-cw"></i> تحديث
+                            </button>
+                        </div>
+                        <div id="partnersBody" class="table-wrap"></div>
+                    </section>
+
+                    <!-- Data -->
+                    <section id="view-data" class="view">
+                        <div class="view-head">
+                            <div>
+                                <h1>البيانات والنظام</h1>
+                                <p>عمر البيانات، حجم القاعدة، وحالة النموذج.</p>
+                            </div>
+                            <button id="refreshData" type="button" class="btn btn-ghost btn-sm">
+                                <i data-lucide="refresh-cw"></i> تحديث
+                            </button>
+                        </div>
+                        <div id="dataKpis" class="kpi-grid"></div>
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div><h2>إجراءات</h2><p class="panel-sub">عمليات تشغيلية لا تُنفَّذ تلقائيًا.</p></div>
+                            </div>
+                            <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+                                <button id="retrainBtn" type="button" class="btn btn-ghost">
+                                    <i data-lucide="rotate-cw"></i> إعادة تدريب النموذج
+                                </button>
+                                <a class="btn btn-ghost" href="/health/data" target="_blank" rel="noopener">
+                                    <i data-lucide="braces"></i> فحص freshness الخام
+                                </a>
+                            </div>
+                            <div id="dataNote" class="inline-note" style="margin-top:14px">
+                                <i data-lucide="key-round"></i><span>—</span>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <span>PUBG Oracle © 2026</span>
+        <span>لوحة الإدارة — كل الإجراءات تُسجَّل باسم admin.</span>
+    </footer>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="/static/shared.js"></script>
+<script src="/static/admin.js"></script>
+</body>
+</html>

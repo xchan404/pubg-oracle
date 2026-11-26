@@ -6,24 +6,38 @@ uses SQLite's online backup API rather than raw file copy.
 """
 
 import argparse
+import os
 import sqlite3
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-BACKUP_DIR = Path("backups")
+BACKUP_DIR = Path(os.getenv("BACKUP_DIR", "backups"))
 DEFAULT_KEEP = 7
+
+
+def _resolve_backup_dir() -> Path:
+    """Use BACKUP_DIR when writable; otherwise fall back to the temp dir."""
+    global BACKUP_DIR
+    try:
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        BACKUP_DIR = Path(tempfile.gettempdir()) / "pubg_backups"
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"[backup] falling back to {BACKUP_DIR}")
+    return BACKUP_DIR
 
 
 def backup(db_path: Path, keep: int = DEFAULT_KEEP) -> Path:
     if not db_path.exists():
         raise FileNotFoundError(f"Database not found: {db_path}")
 
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup_dir = _resolve_backup_dir()
     stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-    target = BACKUP_DIR / f"pubg_accounts_{stamp}.db"
+    target = backup_dir / f"pubg_accounts_{stamp}.db"
 
     src = sqlite3.connect(str(db_path))
     try:
@@ -35,7 +49,7 @@ def backup(db_path: Path, keep: int = DEFAULT_KEEP) -> Path:
     finally:
         src.close()
 
-    backups = sorted(BACKUP_DIR.glob("pubg_accounts_*.db"))
+    backups = sorted(backup_dir.glob("pubg_accounts_*.db"))
     for old in backups[:-keep]:
         old.unlink()
 
