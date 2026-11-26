@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 # System deps (procps for pgrep in container healthchecks)
-RUN apt-get update && apt-get install -y --no-install-recommends procps \
+RUN apt-get update && apt-get install -y --no-install-recommends procps libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Dependencies

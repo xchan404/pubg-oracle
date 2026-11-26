@@ -258,7 +258,7 @@ def run_retrain_service(check_only: bool = False, force: bool = False, threshold
         current_rows = get_dataset_row_count(CSV_PATH)
     except Exception as e:
         print(f"[ERROR] Failed to count CSV dataset rows: {e}")
-        sys.exit(1)
+        raise FileNotFoundError(f"Dataset CSV not found at: {csv_path}") from e
 
     print(f"\n[INFO] Dataset CSV Path: {CSV_PATH}")
     print(f"[INFO] Current Dataset Size: {current_rows:,} accounts")
