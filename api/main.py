@@ -372,6 +372,12 @@ def health_check():
     return {"status": "ok", "model_loaded": pricer is not None, "data": data}
 
 
+@app.get("/healthz")
+def healthz():
+    """Plain liveness probe for container healthchecks: always 200, no DB access."""
+    return {"status": "ok"}
+
+
 @app.get("/health/data")
 def health_data():
     """Dedicated freshness probe for monitoring/alerting."""

@@ -52,11 +52,14 @@ python -m pytest -q
 2. Launch an EC2 instance (Amazon Linux 2023 or Ubuntu) and attach the `LabInstanceProfile` IAM role.
 3. Create a 20 GiB gp3 EBS volume in the same AZ, attach, format (`mkfs -t xfs`), mount at `/mnt/pubg-data`, add to `/etc/fstab`.
 4. Create the S3 bucket with versioning ON and Block Public Access all ON.
-5. Bootstrap the instance (Docker, Compose, clone repo), then deploy:
+5. Bootstrap the instance (Docker, Compose, clone repo). Before the first `up`, prepare the EBS mount and seed models:
 
 ```bash
+sudo mkdir -p /mnt/pubg-data/{models,db,sessions}
+sudo chown -R 1000:1000 /mnt/pubg-data
 git clone https://github.com/xchan404/pubg-oracle.git && cd pubg-oracle
 cp .env.example .env   # fill in real values locally, never commit
+bash scripts/aws/seed_models.sh   # one-time: seed models into /mnt/pubg-data/models
 docker compose -f docker-compose.yml -f compose.aws.yaml up -d --build
 docker compose ps
 curl http://localhost:8000/market/summary
