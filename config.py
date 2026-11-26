@@ -19,15 +19,15 @@ API_HASH = os.getenv("API_HASH")
 SESSION_NAME = os.getenv("TELEGRAM_SESSION_NAME", "pubg_scraper_session")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not API_ID_RAW or not API_HASH:
-    raise ValueError(
-        "خطأ: يرجى التأكد من ضبط API_ID و API_HASH في ملف .env"
-    )
-
-try:
+# Be lenient at import time so non-scraper services (api) can start even when
+# credentials are unset or still placeholders. The scraper validates later.
+if API_ID_RAW and API_ID_RAW.isdigit():
     API_ID = int(API_ID_RAW)
-except ValueError as api_id_err:
-    raise ValueError("خطأ: يجب أن يكون TELEGRAM_API_ID عبارة عن أرقام فقط.") from api_id_err
+else:
+    API_ID = 0
+
+if not API_HASH:
+    API_HASH = ""
 
 API_HASH = str(API_HASH).strip()
 
