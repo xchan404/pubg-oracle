@@ -26,3 +26,6 @@ mlruns/
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# ── SSH keys (never commit) ─────────────────────────────────
+*.pem
